@@ -154,6 +154,31 @@
 
 <script>
 "use strict";
+
+/*PW_I18N_TABLE*/
+/* Generated at build time from the same translation file the DLL uses, so the
+ * window and this page cannot disagree about what a string says. */
+let LANG = "zh";
+const t = s => (LANG === "en" ? (PW_T[s] || s) : s);
+
+/* Translates the static markup once by looking each text node up in the
+ * dictionary, which is why the keys are plain text. Rows rendered later are
+ * built from event data and are not touched. */
+function translateDom() {
+  if (LANG !== "en") return;
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  for (const n of nodes) {
+    const raw = n.nodeValue, key = raw.trim();
+    if (key && PW_T[key]) n.nodeValue = raw.replace(key, PW_T[key]);
+  }
+  for (const el of document.querySelectorAll("[placeholder]")) {
+    const k = el.placeholder.trim();
+    if (PW_T[k]) el.placeholder = PW_T[k];
+  }
+}
+
 const CAT = {1:["文件","c-file"],2:["注册表","c-reg"],3:["网络","c-net"],4:["HTTP","c-http"],
              5:["进程","c-proc"],6:["模块","c-mod"],7:["内存","c-mem"],8:["系统","c-sys"]};
 const LVL = {0:["信息","l-info"],1:["注意","l-warn"],2:["可疑","l-susp"]};
@@ -174,7 +199,7 @@ function matches(e) {
   if (filterCat && e.cat !== filterCat) return false;
   if (onlySusp && e.lvl !== 2) return false;
   if (q) {
-    const s = (e.target + " " + e.detail + " " + e.api + " " + (CAT[e.cat] ? CAT[e.cat][0] : "")).toLowerCase();
+    const s = (e.target + " " + e.detail + " " + e.api + " " + (CAT[e.cat] ? t(CAT[e.cat][0]) : "")).toLowerCase();
     if (s.indexOf(q) < 0) return false;
   }
   return true;
@@ -188,10 +213,11 @@ function visible() {
 
 function rowHtml(e) {
   const c = CAT[e.cat] || ["?",""]; const l = LVL[e.lvl] || ["?",""];
-  const detail = esc(e.detail).replace(/\[规则\]/g, '<span class="rule">[规则]</span>');
+  const detail = esc(e.detail).replace(/\[规则\]/g,
+    '<span class="rule">' + t("[规则]") + '</span>');
   return '<tr data-seq="' + e.seq + '">'
     + '<td class="t">' + esc((e.time || "").slice(11)) + '</td>'
-    + '<td class="' + c[1] + '">' + c[0] + '</td>'
+    + '<td class="' + c[1] + '">' + t(c[0]) + '</td>'
     + '<td><span class="lvl ' + l[1] + '">' + l[0] + '</span></td>'
     + '<td class="api">' + esc(e.api) + '</td>'
     + '<td class="tgt">' + esc(e.target) + '</td>'
@@ -204,7 +230,7 @@ function redraw() {
   const body = $("rows");
   body.innerHTML = tail.length
     ? tail.map(rowHtml).join("")
-    : '<tr><td colspan="6" class="empty">没有符合过滤条件的事件</td></tr>';
+    : '<tr><td colspan="6" class="empty">' + t("没有符合过滤条件的事件") + '</td></tr>';
   if (follow) body.parentElement.parentElement.scrollTop = 1e9;
   const sel = body.querySelector('tr[data-seq="' + selectedSeq + '"]');
   if (sel) sel.classList.add("sel");
@@ -227,11 +253,13 @@ function refreshStats(precomputed) {
   const counts = {1:0,2:0,3:0,4:0,5:0,6:0,7:0,8:0};
   let susp = 0;
   for (const e of rows) { counts[e.cat] = (counts[e.cat] || 0) + 1; if (e.lvl === 2) susp++; }
-  let html = '<div class="stat"><i>显示</i><b>' + rows.length + '</b></div>'
-           + '<div class="stat"><i>可疑</i><b style="color:var(--susp)">' + susp + '</b></div>';
+  /* The chips are built here rather than in the markup, so they are translated
+   * explicitly instead of by the one-off DOM walk. */
+  let html = '<div class="stat"><i>' + t("显示") + '</i><b>' + rows.length + '</b></div>'
+           + '<div class="stat"><i>' + t("可疑") + '</i><b style="color:var(--susp)">' + susp + '</b></div>';
   for (const k in CAT) {
     if (!counts[k]) continue;
-    html += '<div class="stat ' + CAT[k][1] + '"><i>' + CAT[k][0] + '</i><b>' + counts[k] + '</b></div>';
+    html += '<div class="stat ' + CAT[k][1] + '"><i>' + t(CAT[k][0]) + '</i><b>' + counts[k] + '</b></div>';
   }
   $("stats").innerHTML = html;
 }
@@ -249,13 +277,13 @@ function showDetail(e) {
   const c = CAT[e.cat] || ["?",""], l = LVL[e.lvl] || ["?",""];
   $("dBody").innerHTML =
     '<div class="kv">'
-    + '<i>时间</i><span>' + esc(e.time) + '</span>'
-    + '<i>线程</i><span>' + e.tid + '</span>'
-    + '<i>类别</i><span class="' + c[1] + '">' + c[0] + '</span>'
-    + '<i>级别</i><span class="' + l[1] + '">' + l[0] + '</span>'
+    + '<i>' + t("时间") + '</i><span>' + esc(e.time) + '</span>'
+    + '<i>' + t("线程") + '</i><span>' + e.tid + '</span>'
+    + '<i>' + t("类别") + '</i><span class="' + c[1] + '">' + t(c[0]) + '</span>'
+    + '<i>' + t("级别") + '</i><span class="' + l[1] + '">' + t(l[0]) + '</span>'
     + '<i>API</i><span class="mono">' + esc(e.api) + '</span>'
-    + '<i>字节数</i><span>' + (e.size || 0) + '</span>'
-    + '<i>返回值</i><span>' + e.result + '</span>'
+    + '<i>' + t("字节数") + '</i><span>' + (e.size || 0) + '</span>'
+    + '<i>' + t("返回值") + '</i><span>' + e.result + '</span>'
     + '</div><pre>' + esc(e.target) + '</pre><pre>' + esc(e.detail) + '</pre>'
     + '<pre style="color:var(--dim2)">' + esc(JSON.stringify(e)) + '</pre>';
   $("drawer").classList.add("open");
@@ -287,18 +315,22 @@ async function loadMeta() {
     $("mPid").textContent = meta.pid;
     $("mUser").textContent = meta.user;
     $("mUrl").textContent = meta.url;
-    document.title = "ProcWatch - " + meta.exe + " (" + meta.pid + ")";
+    /* The server tells us which language it is speaking, so the page follows
+     * the DLL rather than guessing. */
+    LANG = meta.lang || LANG;
+    translateDom();
+    document.title = t("ProcWatch 行为监控") + " - " + meta.exe + " (" + meta.pid + ")";
     setInterval(() => {
       const up = Math.floor((Date.now() - meta.startedMs) / 1000);
       const h = Math.floor(up / 3600), m = Math.floor(up % 3600 / 60), s = up % 60;
-      $("mUp").textContent = (h ? h + "时" : "") + (m ? m + "分" : "") + s + "秒";
+      $("mUp").textContent = (h ? h + t("时") : "") + (m ? m + t("分") : "") + s + t("秒");
       $("mDrop").textContent = meta.dropped;
     }, 1000);
   } catch (e) {
     /* Surfaced rather than swallowed: a blank header used to mean a malformed
      * response, and silence made that hard to notice. */
-    document.title = "ProcWatch - 元数据读取失败";
-    $("mExe").textContent = "读取失败: " + e.message;
+    document.title = t("ProcWatch - 元数据读取失败");
+    $("mExe").textContent = t("读取失败: ") + e.message;
   }
 }
 
@@ -311,7 +343,7 @@ async function loadHistory() {
 function startStream() {
   if (source) source.close();
   source = new EventSource("/api/stream");
-  source.addEventListener("open", () => { fails = 0; setStatus("实时推送中", "on"); });
+  source.addEventListener("open", () => { fails = 0; setStatus(t("实时推送中"), "on"); });
   source.addEventListener("events", ev => {
     try {
       const arr = JSON.parse(ev.data);
@@ -321,25 +353,25 @@ function startStream() {
   });
   source.addEventListener("cleared", () => { all = []; redraw(); });
   source.onerror = () => {
-    setStatus("推送中断，重试中…", "off");
+    setStatus(t("推送中断，重试中…"), "off");
     if (++fails >= 3) { source.close(); source = null; startPolling(); }
   };
 }
 
 function startPolling() {
   if (pollTimer) return;
-  setStatus("轮询模式", "on");
+  setStatus(t("轮询模式"), "on");
   pollTimer = setInterval(async () => {
     try {
       const r = await (await fetch("/api/events?after=" + cursor + "&limit=500")).json();
       if (r.events && r.events.length) { addAll(r.events); appendRows(r.events); }
-    } catch (e) { setStatus("连接已断开", "off"); }
+    } catch (e) { setStatus(t("连接已断开"), "off"); }
   }, 1000);
 }
 
 $("bPause").onclick = async () => {
   paused = !paused;
-  $("bPause").textContent = paused ? "继续采集" : "暂停采集";
+  $("bPause").textContent = paused ? t("继续采集") : t("暂停采集");
   $("bPause").classList.toggle("active", paused);
   await fetch("/api/pause?on=" + (paused ? 1 : 0), { method: "POST" });
 };
@@ -355,9 +387,9 @@ $("fQ").oninput = e => {
 $("bJson").onclick = () => { location.href = "/api/export?format=jsonl"; };
 $("bCsv").onclick = () => { location.href = "/api/export?format=csv"; };
 $("bCopy").onclick = async () => {
-  const rows = visible().map(e => [e.time, (CAT[e.cat]||["?"])[0], (LVL[e.lvl]||["?"])[0], e.api, e.target, e.detail].join("  "));
-  try { await navigator.clipboard.writeText(rows.join("\n")); $("bCopy").textContent = "已复制 " + rows.length + " 行";
-        setTimeout(() => $("bCopy").textContent = "复制当前视图", 1500); } catch (e) {}
+  const rows = visible().map(e => [e.time, t((CAT[e.cat]||["?"])[0]), t((LVL[e.lvl]||["?"])[0]), e.api, e.target, e.detail].join("  "));
+  try { await navigator.clipboard.writeText(rows.join("\n")); $("bCopy").textContent = t("已复制 ") + rows.length + t(" 行");
+        setTimeout(() => $("bCopy").textContent = t("复制当前视图"), 1500); } catch (e) {}
 };
 document.addEventListener("keydown", e => {
   if (e.key === "Escape") $("drawer").classList.remove("open");
@@ -366,7 +398,7 @@ document.addEventListener("keydown", e => {
 
 (async function main() {
   await loadMeta();
-  try { await loadHistory(); } catch (e) { setStatus("无法读取历史", "off"); }
+  try { await loadHistory(); } catch (e) { setStatus(t("无法读取历史"), "off"); }
   startStream();
   setTimeout(() => { if (!source && !pollTimer) startPolling(); }, 4000);
 })();

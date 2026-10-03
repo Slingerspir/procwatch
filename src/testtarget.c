@@ -28,6 +28,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "pw_lang.h"
 
 /* MinGW's wininet.h and winhttp.h redefine INTERNET_SCHEME and URL_COMPONENTS
  * with incompatible types, so the four WinINet entry points used below are
@@ -84,7 +85,7 @@ static void do_files(void)
     char readback[256] = {0};
     DWORD got = 0;
 
-    hr("文件操作：创建 / 写入 / 读取 / 复制 / 改名 / 枚举 / 删除");
+    hr(L("文件操作：创建 / 写入 / 读取 / 复制 / 改名 / 枚举 / 删除"));
 
     GetTempPathA(sizeof(temp), temp);
     _snprintf(dir, sizeof(dir), "%sProcWatchTest", temp);
@@ -98,11 +99,11 @@ static void do_files(void)
     h = CreateFileA(f1, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     if (h != INVALID_HANDLE_VALUE) {
         _snprintf(data, sizeof(data),
-                  "ProcWatch 测试数据 hello world 时间戳=%lu\r\n", GetTickCount());
+                  L("ProcWatch 测试数据 hello world 时间戳=%lu\r\n"), GetTickCount());
         data[sizeof(data) - 1] = 0;
         WriteFile(h, data, (DWORD)strlen(data), &written, NULL);
         CloseHandle(h);
-        ok("写入 %s（%lu 字节）", f1, (unsigned long)written);
+        ok(L("写入 %s（%lu 字节）"), f1, (unsigned long)written);
     }
     gap();
 
@@ -112,16 +113,16 @@ static void do_files(void)
         ReadFile(h, readback, sizeof(readback) - 1, &got, NULL);
         readback[got] = 0;
         CloseHandle(h);
-        ok("读取回 %lu 字节", (unsigned long)got);
+        ok(L("读取回 %lu 字节"), (unsigned long)got);
     }
     gap();
 
     CopyFileA(f1, f2, FALSE);
-    ok("复制 -> %s", f2);
+    ok(L("复制 -> %s"), f2);
     gap();
 
     MoveFileExA(f2, f3, MOVEFILE_REPLACE_EXISTING);
-    ok("改名 -> %s", f3);
+    ok(L("改名 -> %s"), f3);
     gap();
 
     {
@@ -135,7 +136,7 @@ static void do_files(void)
             do { n++; } while (FindNextFileA(h, &fd));
             FindClose(h);
         }
-        ok("枚举目录，共 %d 个条目", n);
+        ok(L("枚举目录，共 %d 个条目"), n);
     }
     gap();
 
@@ -162,7 +163,7 @@ static void do_files(void)
                                 FILE_ATTRIBUTE_NORMAL, NULL);
                 if (h != INVALID_HANDLE_VALUE) CloseHandle(h);
             }
-            ok("尝试打开 %d 个凭据类路径（预期失败，用于验证规则匹配）",
+            ok(L("尝试打开 %d 个凭据类路径（预期失败，用于验证规则匹配）"),
                (int)(sizeof(probes) / sizeof(probes[0])));
         }
     }
@@ -171,7 +172,7 @@ static void do_files(void)
     DeleteFileA(f1);
     DeleteFileA(f3);
     RemoveDirectoryA(dir);
-    ok("清理完成");
+    ok(L("清理完成"));
 }
 
 /* ---------------------------------------------------------------- registry */
@@ -182,33 +183,33 @@ static void do_registry(void)
     DWORD disp = 0, value = 0x1234ABCD, size = sizeof(value), type = 0;
     LSTATUS st;
 
-    hr("注册表：创建键 / 写入值 / 读回 / 删除");
+    hr(L("注册表：创建键 / 写入值 / 读回 / 删除"));
 
     st = RegCreateKeyExA(HKEY_CURRENT_USER, "Software\\ProcWatchTest", 0, NULL,
                          REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &key, &disp);
     if (st == ERROR_SUCCESS) {
-        ok("创建 HKCU\\Software\\ProcWatchTest（%s）",
-           disp == REG_CREATED_NEW_KEY ? "新建" : "已存在");
+        ok(L("创建 HKCU\\Software\\ProcWatchTest（%s）"),
+           disp == REG_CREATED_NEW_KEY ? L("新建") : L("已存在"));
 
         RegSetValueExA(key, "Marker", 0, REG_DWORD, (const BYTE *)&value, sizeof(value));
-        ok("写入 REG_DWORD Marker = 0x%08lX", (unsigned long)value);
+        ok(L("写入 REG_DWORD Marker = 0x%08lX"), (unsigned long)value);
         gap();
 
         RegSetValueExA(key, "Note", 0, REG_SZ, (const BYTE *)"procwatch test",
                        (DWORD)(strlen("procwatch test") + 1));
-        ok("写入 REG_SZ Note");
+        ok(L("写入 REG_SZ Note"));
         gap();
 
         st = RegQueryValueExA(key, "Marker", NULL, &type, (LPBYTE)&value, &size);
-        ok("读回 Marker = 0x%08lX（%s）", (unsigned long)value,
-           st == ERROR_SUCCESS ? "成功" : "失败");
+        ok(L("读回 Marker = 0x%08lX（%s）"), (unsigned long)value,
+           st == ERROR_SUCCESS ? L("成功") : L("失败"));
         RegCloseKey(key);
         gap();
 
         RegDeleteKeyA(HKEY_CURRENT_USER, "Software\\ProcWatchTest");
-        ok("删除测试键");
+        ok(L("删除测试键"));
     } else {
-        ok("创建注册表键失败（%ld）", (long)st);
+        ok(L("创建注册表键失败（%ld）"), (long)st);
     }
     gap();
 
@@ -223,9 +224,9 @@ static void do_registry(void)
             DWORD cb = sizeof(proxy), t = 0;
             proxy[0] = 0;
             if (RegQueryValueExA(k, "ProxyServer", NULL, &t, (LPBYTE)proxy, &cb) == ERROR_SUCCESS)
-                ok("系统代理设置为：%s", proxy);
+                ok(L("系统代理设置为：%s"), proxy);
             else
-                ok("当前未配置系统代理");
+                ok(L("当前未配置系统代理"));
             RegCloseKey(k);
         }
     }
@@ -244,7 +245,7 @@ static void do_registry(void)
                 n++;
                 cbName = 256;
             }
-            ok("现有 %lu 个自启动项（仅读取，未修改）", (unsigned long)n);
+            ok(L("现有 %lu 个自启动项（仅读取，未修改）"), (unsigned long)n);
             RegCloseKey(k);
         }
     }
@@ -263,7 +264,7 @@ static void do_registry(void)
             const char *payload = "C:\\demo\\payload.exe";
             RegSetValueExA(k, "ProcWatchDemo", 0, REG_SZ, (const BYTE *)payload,
                            (DWORD)(strlen(payload) + 1));
-            ok("写入模拟自启动路径 %s（仅测试键，未触碰真实 Run 键）", sim);
+            ok(L("写入模拟自启动路径 %s（仅测试键，未触碰真实 Run 键）"), sim);
             RegCloseKey(k);
             gap();
             RegDeleteKeyA(HKEY_CURRENT_USER, sim);
@@ -281,14 +282,14 @@ static void do_network(void)
     struct addrinfo hints, *res = NULL;
     char addrText[64] = {0};
 
-    hr("网络：DNS 解析 / TCP 连接 / 发送与接收");
+    hr(L("网络：DNS 解析 / TCP 连接 / 发送与接收"));
 
-    if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) { ok("Winsock 初始化失败"); return; }
+    if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) { ok(L("Winsock 初始化失败")); return; }
 
     {
         SOCKET dgram = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
         if (dgram != INVALID_SOCKET) {
-            ok("创建 UDP 套接字（演示 socket 钩子）");
+            ok(L("创建 UDP 套接字（演示 socket 钩子）"));
             closesocket(dgram);
         }
     }
@@ -306,7 +307,7 @@ static void do_network(void)
             _snprintf(addrText, sizeof(addrText), "%u.%u.%u.%u",
                       (ip >> 24) & 0xFF, (ip >> 16) & 0xFF, (ip >> 8) & 0xFF, ip & 0xFF);
         }
-        ok("DNS 解析 example.com -> %s", addrText);
+        ok(L("DNS 解析 example.com -> %s"), addrText);
         gap();
 
         s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -315,19 +316,19 @@ static void do_network(void)
                 const char *req = "HEAD / HTTP/1.0\r\nHost: example.com\r\n\r\n";
                 char buf[512];
                 int n;
-                ok("TCP 连接成功，发送裸 HTTP 请求");
+                ok(L("TCP 连接成功，发送裸 HTTP 请求"));
                 send(s, req, (int)strlen(req), 0);
                 n = recv(s, buf, sizeof(buf) - 1, 0);
-                if (n > 0) { buf[n] = 0; ok("收到 %d 字节响应", n); }
-                else ok("未收到响应（可能无外网或已被防火墙丢弃）");
+                if (n > 0) { buf[n] = 0; ok(L("收到 %d 字节响应"), n); }
+                else ok(L("未收到响应（可能无外网或已被防火墙丢弃）"));
             } else {
-                ok("TCP 连接失败（离线或代理环境下属正常，钩子仍然记录）");
+                ok(L("TCP 连接失败（离线或代理环境下属正常，钩子仍然记录）"));
             }
             closesocket(s);
         }
         freeaddrinfo(res);
     } else {
-        ok("DNS 解析失败（离线环境属正常）");
+        ok(L("DNS 解析失败（离线环境属正常）"));
     }
 
     WSACleanup();
@@ -340,41 +341,41 @@ static void do_http_winhttp(void)
     HINTERNET session, conn, req;
     DWORD status = 0, len = sizeof(status);
 
-    hr("HTTP（WinHTTP）：会话 / 连接 / 请求 / 响应头");
+    hr(L("HTTP（WinHTTP）：会话 / 连接 / 请求 / 响应头"));
 
     session = WinHttpOpen(L"ProcWatchTest/1.0", WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
                           WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
     if (!session) {
-        ok("WinHttpOpen 失败（%lu）", (unsigned long)GetLastError());
+        ok(L("WinHttpOpen 失败（%lu）"), (unsigned long)GetLastError());
         return;
     }
-    ok("WinHttpOpen 成功");
+    ok(L("WinHttpOpen 成功"));
     gap();
 
     conn = WinHttpConnect(session, L"example.com", 80, 0);
     if (conn) {
-        ok("WinHttpConnect 成功");
+        ok(L("WinHttpConnect 成功"));
         req = WinHttpOpenRequest(conn, L"GET", L"/", NULL, WINHTTP_NO_REFERER,
                                  WINHTTP_DEFAULT_ACCEPT_TYPES, 0);
         if (req) {
             if (WinHttpSendRequest(req, WINHTTP_NO_ADDITIONAL_HEADERS, 0,
                                    WINHTTP_NO_REQUEST_DATA, 0, 0, 0)) {
-                ok("请求已发送");
+                ok(L("请求已发送"));
                 if (WinHttpReceiveResponse(req, NULL)) {
                     if (WinHttpQueryHeaders(req, WINHTTP_QUERY_STATUS_CODE |
                                                  WINHTTP_QUERY_FLAG_NUMBER,
                                             WINHTTP_HEADER_NAME_BY_INDEX, &status, &len,
                                             WINHTTP_NO_HEADER_INDEX))
-                        ok("HTTP 状态码 %lu", (unsigned long)status);
+                        ok(L("HTTP 状态码 %lu"), (unsigned long)status);
                 }
             } else {
-                ok("发送失败（离线属正常）");
+                ok(L("发送失败（离线属正常）"));
             }
             WinHttpCloseHandle(req);
         }
         WinHttpCloseHandle(conn);
     } else {
-        ok("WinHttpConnect 失败（离线属正常）");
+        ok(L("WinHttpConnect 失败（离线属正常）"));
     }
     WinHttpCloseHandle(session);
 }
@@ -383,12 +384,12 @@ static void do_http_wininet(void)
 {
     HINTERNET net, url;
 
-    hr("HTTP（WinINet）：InternetOpen / InternetOpenUrl / InternetReadFile");
+    hr(L("HTTP（WinINet）：InternetOpen / InternetOpenUrl / InternetReadFile"));
 
     net = InternetOpenA("ProcWatchTest/1.0 (WinINet)",
                         INTERNET_OPEN_TYPE_PRECONFIG, NULL, NULL, 0);
-    if (!net) { ok("InternetOpen 失败（%lu）", (unsigned long)GetLastError()); return; }
-    ok("InternetOpen 成功（使用系统代理配置）");
+    if (!net) { ok(L("InternetOpen 失败（%lu）"), (unsigned long)GetLastError()); return; }
+    ok(L("InternetOpen 成功（使用系统代理配置）"));
     gap();
 
     url = InternetOpenUrlA(net, "http://example.com/", NULL, 0,
@@ -396,16 +397,16 @@ static void do_http_wininet(void)
     if (url) {
         char buf[1024];
         DWORD got = 0;
-        ok("InternetOpenUrl 成功");
+        ok(L("InternetOpenUrl 成功"));
         if (InternetReadFile(url, buf, sizeof(buf) - 1, &got) && got) {
             buf[got] = 0;
-            ok("读取到 %lu 字节响应体", (unsigned long)got);
+            ok(L("读取到 %lu 字节响应体"), (unsigned long)got);
         } else {
-            ok("未读到内容（离线属正常）");
+            ok(L("未读到内容（离线属正常）"));
         }
         InternetCloseHandle(url);
     } else {
-        ok("InternetOpenUrl 失败（离线属正常）");
+        ok(L("InternetOpenUrl 失败（离线属正常）"));
     }
     InternetCloseHandle(net);
 }
@@ -419,21 +420,21 @@ static void do_process(void)
     char temp[MAX_PATH], drop[MAX_PATH];
     char cmd[1024];
 
-    hr("进程：系统工具调用 / 临时目录落地并执行");
+    hr(L("进程：系统工具调用 / 临时目录落地并执行"));
 
     memset(&si, 0, sizeof(si));
     si.cb = sizeof(si);
     memset(&pi, 0, sizeof(pi));
 
-    _snprintf(cmd, sizeof(cmd), "cmd.exe /c echo ProcWatch 测试输出 & timeout /t 1 >nul");
+    _snprintf(cmd, sizeof(cmd), L("cmd.exe /c echo ProcWatch 测试输出 & timeout /t 1 >nul"));
     cmd[sizeof(cmd) - 1] = 0;
     if (CreateProcessA(NULL, cmd, NULL, NULL, FALSE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
-        ok("启动 cmd.exe（PID %lu）", (unsigned long)pi.dwProcessId);
+        ok(L("启动 cmd.exe（PID %lu）"), (unsigned long)pi.dwProcessId);
         WaitForSingleObject(pi.hProcess, 5000);
         CloseHandle(pi.hThread);
         CloseHandle(pi.hProcess);
     } else {
-        ok("启动 cmd.exe 失败");
+        ok(L("启动 cmd.exe 失败"));
     }
     gap();
 
@@ -444,7 +445,7 @@ static void do_process(void)
     drop[sizeof(drop) - 1] = 0;
 
     if (CopyFileA(g_self, drop, FALSE)) {
-        ok("已把自身复制到 %s", drop);
+        ok(L("已把自身复制到 %s"), drop);
         gap();
 
         _snprintf(cmd, sizeof(cmd), "\"%s\" --child", drop);
@@ -453,16 +454,16 @@ static void do_process(void)
         si.cb = sizeof(si);
         memset(&pi, 0, sizeof(pi));
         if (CreateProcessA(NULL, cmd, NULL, NULL, FALSE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
-            ok("启动临时目录中的副本（PID %lu）", (unsigned long)pi.dwProcessId);
+            ok(L("启动临时目录中的副本（PID %lu）"), (unsigned long)pi.dwProcessId);
             WaitForSingleObject(pi.hProcess, 5000);
             CloseHandle(pi.hThread);
             CloseHandle(pi.hProcess);
         }
         gap();
         DeleteFileA(drop);
-        ok("已删除副本");
+        ok(L("已删除副本"));
     } else {
-        ok("复制自身失败（%lu）", (unsigned long)GetLastError());
+        ok(L("复制自身失败（%lu）"), (unsigned long)GetLastError());
     }
 }
 
@@ -473,14 +474,14 @@ static void do_modules(void)
     typedef LPVOID (WINAPI *PFN_VirtualAlloc)(LPVOID, SIZE_T, DWORD, DWORD);
     PFN_VirtualAlloc dyn;
 
-    hr("模块：加载 DLL / 动态解析函数地址");
+    hr(L("模块：加载 DLL / 动态解析函数地址"));
 
     m = LoadLibraryA("version.dll");
-    if (m) { ok("LoadLibraryA(\"version.dll\") 成功"); FreeLibrary(m); }
-    else    ok("LoadLibraryA(\"version.dll\") 失败");
+    if (m) { ok(L("LoadLibraryA(\"version.dll\") 成功")); FreeLibrary(m); }
+    else    ok(L("LoadLibraryA(\"version.dll\") 失败"));
 
     m = LoadLibraryA("winhttp.dll");
-    if (m) { ok("LoadLibraryA(\"winhttp.dll\") 成功"); FreeLibrary(m); }
+    if (m) { ok(L("LoadLibraryA(\"winhttp.dll\") 成功")); FreeLibrary(m); }
 
     /* Resolving an API at runtime instead of importing it is the shape of an
      * unpacker or a loader stub, so the monitor records the name. */
@@ -492,7 +493,7 @@ static void do_modules(void)
         LPVOID mem = dyn(NULL, 4096, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
         if (mem) {
             memset(mem, 0x90, 16);
-            ok("通过动态地址申请 4096 字节并写入");
+            ok(L("通过动态地址申请 4096 字节并写入"));
             VirtualFree(mem, 0, MEM_RELEASE);
         }
     }
@@ -506,17 +507,17 @@ static void do_memory(void)
     SIZE_T wrote = 0;
     unsigned char payload[64];
 
-    hr("内存：可写可执行内存 / 跨进程写内存与改权限");
+    hr(L("内存：可写可执行内存 / 跨进程写内存与改权限"));
 
     /* PAGE_EXECUTE_READWRITE is what a shellcode loader asks for. We allocate,
      * write a NOP sled into it and release it - nothing is executed. */
     mem = VirtualAlloc(NULL, 8192, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
     if (mem) {
         memset(mem, 0x90, 64);
-        ok("申请 PAGE_EXECUTE_READWRITE 内存 %p（未执行任何内容）", mem);
+        ok(L("申请 PAGE_EXECUTE_READWRITE 内存 %p（未执行任何内容）"), mem);
         gap();
         VirtualProtect(mem, 8192, PAGE_READONLY, &old);
-        ok("改权限为 PAGE_READONLY（原权限 0x%lX）", (unsigned long)old);
+        ok(L("改权限为 PAGE_READONLY（原权限 0x%lX）"), (unsigned long)old);
         VirtualFree(mem, 0, MEM_RELEASE);
     }
 
@@ -526,10 +527,10 @@ static void do_memory(void)
     if (mem) {
         memset(payload, 0xCC, sizeof(payload));
         if (WriteProcessMemory(self, mem, payload, sizeof(payload), &wrote))
-            ok("向自身进程写入 %llu 字节（模拟注入的第一阶段）",
+            ok(L("向自身进程写入 %llu 字节（模拟注入的第一阶段）"),
                (unsigned long long)wrote);
         VirtualProtectEx(self, mem, 4096, PAGE_EXECUTE_READ, &old);
-        ok("把该内存改为可执行");
+        ok(L("把该内存改为可执行"));
         VirtualFreeEx(self, mem, 0, MEM_RELEASE);
     }
 }
@@ -539,15 +540,24 @@ static void do_memory(void)
 int main(int argc, char **argv)
 {
     int i;
+    int lang = PW_LANG_AUTO;
 
     SetConsoleOutputCP(CP_UTF8);
-    SetConsoleTitleA("ProcWatch 测试靶机");
+
+    /* The language has to be resolved before the first string is printed, and
+     * the title below is already one of them. Options are scanned up front for
+     * that reason; the loop further down still handles the behaviour flags. */
+    for (i = 1; i < argc; i++)
+        if (!strncmp(argv[i], "--lang=", 7)) lang = pw_lang_parse(argv[i] + 7);
+    pw_lang_init(lang);
+
+    SetConsoleTitleA(L("ProcWatch 测试靶机"));
 
     GetModuleFileNameA(NULL, g_self, sizeof(g_self));
 
     for (i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--child")) {
-            printf("[child] 我是被释放到临时目录的副本，PID %lu，马上退出。\n",
+            printf(L("[child] 我是被释放到临时目录的副本，PID %lu，马上退出。\n"),
                    (unsigned long)GetCurrentProcessId());
             Sleep(500);
             return 0;
@@ -558,9 +568,9 @@ int main(int argc, char **argv)
     }
 
     printf("==========================================================\n");
-    printf("  ProcWatch 测试靶机  (PID %lu)\n", (unsigned long)GetCurrentProcessId());
-    printf("  每一步都会产生可被监控端捕获的行为，顺序执行。\n");
-    printf("  所有产物（文件/注册表键/子进程）都会在结束时清理。\n");
+    printf(L("  ProcWatch 测试靶机  (PID %lu)\n"), (unsigned long)GetCurrentProcessId());
+    printf(L("  每一步都会产生可被监控端捕获的行为，顺序执行。\n"));
+    printf(L("  所有产物（文件/注册表键/子进程）都会在结束时清理。\n"));
     printf("==========================================================\n");
     fflush(stdout);
 
@@ -574,13 +584,13 @@ int main(int argc, char **argv)
     do_memory();
 
     printf("\n==========================================================\n");
-    printf("  全部行为执行完毕。\n");
+    printf(L("  全部行为执行完毕。\n"));
     if (g_once) {
-        printf("  --once 指定，退出。\n");
+        printf(L("  --once 指定，退出。\n"));
         return 0;
     }
-    printf("  保持运行 %d 秒，方便在监控窗口/WebUI 里查看结果。\n", g_holdSec);
-    printf("  按 Ctrl+C 或关闭本窗口即可退出。\n");
+    printf(L("  保持运行 %d 秒，方便在监控窗口/WebUI 里查看结果。\n"), g_holdSec);
+    printf(L("  按 Ctrl+C 或关闭本窗口即可退出。\n"));
     printf("==========================================================\n");
     fflush(stdout);
 
@@ -607,7 +617,7 @@ int main(int argc, char **argv)
             Sleep(3000);
             elapsed += 3;
             if (elapsed % 15 == 0) {
-                printf("  [心跳] 已运行 %d 秒，仍被监控中…\n", elapsed);
+                printf(L("  [心跳] 已运行 %d 秒，仍被监控中…\n"), elapsed);
                 fflush(stdout);
             }
         }

@@ -31,6 +31,7 @@
 #include <shellapi.h>
 
 #include "pw_hub_html.h"
+#include "pw_lang.h"
 
 static PW_CONFIG g_cfg;
 static char      g_dllPath[MAX_PATH];
@@ -43,7 +44,7 @@ static void err(const char *fmt, const char *a)
     char buf[900];
     _snprintf(buf, sizeof(buf), fmt, a ? a : "");
     buf[sizeof(buf) - 1] = 0;
-    fprintf(stderr, "[!] %s (错误码 %lu)\n", buf, (unsigned long)GetLastError());
+    fprintf(stderr, L("[!] %s (错误码 %lu)\n"), buf, (unsigned long)GetLastError());
 }
 
 /* ------------------------------------------------------------------ elevation
@@ -102,8 +103,8 @@ static void try_relaunch_elevated(void)
     _snprintf(params, sizeof(params), "%s %s", raw_parameters(), PW_NO_ELEVATE_FLAG);
     params[sizeof(params) - 1] = 0;
 
-    printf("\n[*] 目标需要管理员权限，正在以管理员身份重新启动注入器…\n");
-    printf("    （会弹出 UAC 提示；新窗口里会继续同样的操作）\n\n");
+    printf(L("\n[*] 目标需要管理员权限，正在以管理员身份重新启动注入器…\n"));
+    printf(L("    （会弹出 UAC 提示；新窗口里会继续同样的操作）\n\n"));
 
     memset(&sei, 0, sizeof(sei));
     sei.cbSize = sizeof(sei);
@@ -116,14 +117,14 @@ static void try_relaunch_elevated(void)
     if (!ShellExecuteExA(&sei)) {
         DWORD e = GetLastError();
         if (e == ERROR_CANCELLED)
-            fprintf(stderr, "[!] 已取消提权。请右键以管理员身份运行本程序后重试。\n");
+            fprintf(stderr, L("[!] 已取消提权。请右键以管理员身份运行本程序后重试。\n"));
         else
-            fprintf(stderr, "[!] 提权启动失败（错误码 %lu）。请手动以管理员身份运行。\n",
+            fprintf(stderr, L("[!] 提权启动失败（错误码 %lu）。请手动以管理员身份运行。\n"),
                     (unsigned long)e);
         return;
     }
     if (sei.hProcess) CloseHandle(sei.hProcess);
-    printf("[*] 已在新的管理员窗口中继续，本窗口退出。\n");
+    printf(L("[*] 已在新的管理员窗口中继续，本窗口退出。\n"));
     exit(0);
 }
 
@@ -189,18 +190,18 @@ static int inject_into(DWORD pid, const char *dllFullPath)
     if (!proc) {
         DWORD e = GetLastError();
         if (e == ERROR_ACCESS_DENIED && !already_elevated())
-            fprintf(stderr, "[!] 打开进程被拒绝。若目标是管理员权限或更高完整性级别，"
-                            "本程序也必须以管理员身份运行。\n");
+            fprintf(stderr, L("[!] 打开进程被拒绝。若目标是管理员权限或更高完整性级别，"
+                            "本程序也必须以管理员身份运行。\n"));
         else
-            err("无法打开进程 %lu", NULL);
+            err(L("无法打开进程 %lu"), NULL);
         return 0;
     }
 
     remote = VirtualAllocEx(proc, NULL, len, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-    if (!remote) { err("目标进程内分配内存失败：%s", NULL); CloseHandle(proc); return 0; }
+    if (!remote) { err(L("目标进程内分配内存失败：%s"), NULL); CloseHandle(proc); return 0; }
 
     if (!WriteProcessMemory(proc, remote, wide, len, &written) || written != len) {
-        err("写入 DLL 路径失败：%s", NULL);
+        err(L("写入 DLL 路径失败：%s"), NULL);
         VirtualFreeEx(proc, remote, 0, MEM_RELEASE);
         CloseHandle(proc);
         return 0;
@@ -215,7 +216,7 @@ static int inject_into(DWORD pid, const char *dllFullPath)
                                 remote, 0, NULL);
     if (!thread) {
         /* Some hardened processes (protected/PPL) refuse remote threads. */
-        err("CreateRemoteThread 失败，目标进程可能受保护：%s", NULL);
+        err(L("CreateRemoteThread 失败，目标进程可能受保护：%s"), NULL);
         VirtualFreeEx(proc, remote, 0, MEM_RELEASE);
         CloseHandle(proc);
         return 0;
@@ -228,7 +229,7 @@ static int inject_into(DWORD pid, const char *dllFullPath)
     CloseHandle(proc);
 
     if (exitCode != 0) ok = 1;
-    else err("目标进程内 LoadLibrary 返回失败（位数不匹配或缺少依赖？）：%s", NULL);
+    else err(L("目标进程内 LoadLibrary 返回失败（位数不匹配或缺少依赖？）：%s"), NULL);
     return ok;
 }
 
@@ -377,7 +378,7 @@ static int discover(INSTANCE *list, int cap)
         list[n].port = (int)json_num(meta, "port", 0);
         list[n].gui = (int)json_num(meta, "gui", 0);
         list[n].startedMs = (unsigned long long)json_num(meta, "startedMs", 0);        json_str(meta, "exe", exe, sizeof(exe));
-        pw_str_copy(list[n].exe, sizeof(list[n].exe), exe[0] ? exe : "(未知)");
+        pw_str_copy(list[n].exe, sizeof(list[n].exe), exe[0] ? exe : L("(未知)"));
 
         /* Is the instance still answering? */
         if (list[n].port > 0) {
@@ -447,7 +448,12 @@ static void hub_list(int fd)
     int cap = 0;
 
     if (!buf) return;
-    cap += snprintf(buf + cap, 65536 - (size_t)cap, "[");
+    /* The page needs to know which language the hub is speaking before it can
+     * localise itself, so it travels with the data rather than in a second
+     * request. */
+    cap += snprintf(buf + cap, 65536 - (size_t)cap,
+                    "{\"lang\":\"%s\",\"instances\":[",
+                    pw_lang_is_en() ? "en" : "zh");
     for (i = 0; i < n; i++) {
         cap += snprintf(buf + cap, 65536 - (size_t)cap,
                         "%s{\"pid\":%lu,\"exe\":\"%s\",\"port\":%d,\"gui\":%d,"
@@ -459,7 +465,7 @@ static void hub_list(int fd)
                         list[i].uptimeMs);
         if (cap > 63000) break;
     }
-    cap += snprintf(buf + cap, 65536 - (size_t)cap, "]");
+    cap += snprintf(buf + cap, 65536 - (size_t)cap, "]}");
     hub_send(fd, "application/json; charset=utf-8", buf, cap);
     free(buf);
 }
@@ -607,18 +613,18 @@ static void print_instances(void)
     INSTANCE list[MAX_INSTANCES];
     int n = discover(list, MAX_INSTANCES), i;
 
-    if (!n) { printf("没有发现已注入 ProcWatch 的进程。\n"); return; }
-    printf("%-8s %-28s %-7s %-10s %-9s %s\n", "PID", "进程", "端口", "事件", "可疑", "状态");
+    if (!n) { printf(L("没有发现已注入 ProcWatch 的进程。\n")); return; }
+    printf("%-8s %-28s %-7s %-10s %-9s %s\n", "PID", L("进程"), L("端口"), L("事件"), L("可疑"), L("状态"));
     printf("--------------------------------------------------------------------------\n");
     for (i = 0; i < n; i++) {
         char up[64];
         unsigned long long s = (list[i].uptimeMs ? (unsigned long long)list[i].uptimeMs : 0) / 1000;
-        _snprintf(up, sizeof(up), "%llu时%llu分%llu秒", s / 3600, (s % 3600) / 60, s % 60);
+        _snprintf(up, sizeof(up), L("%llu时%llu分%llu秒"), s / 3600, (s % 3600) / 60, s % 60);
         up[sizeof(up) - 1] = 0;
         printf("%-8lu %-28s %-7d %-10lld %-9lld %s  %s\n",
                (unsigned long)list[i].pid, list[i].exe, list[i].port,
                list[i].events, list[i].suspect,
-               list[i].alive ? "运行中" : "已退出", up);
+               list[i].alive ? L("运行中") : L("已退出"), up);
     }
 }
 
@@ -632,57 +638,61 @@ static void report_target(DWORD pid)
         for (i = 0; i < n; i++) {
             if (list[i].pid == pid && list[i].alive) {
                 printf("  PID      : %lu\n", (unsigned long)pid);
-                printf("  进程     : %s\n", list[i].exe);
+                printf(L("  进程     : %s\n"), list[i].exe);
                 printf("  WebUI    : http://127.0.0.1:%d/\n", list[i].port);
                 if (g_cfg.gui)
-                    printf("  进程窗口 : 已在目标进程内创建（若该进程无桌面则只有 WebUI）\n");
+                    printf(L("  进程窗口 : 已在目标进程内创建（若该进程无桌面则只有 WebUI）\n"));
                 else
-                    printf("  进程窗口 : 已禁用（--gui=0）\n");
+                    printf(L("  进程窗口 : 已禁用（--gui=0）\n"));
                 if (g_hubRunning)
-                    printf("  控制台   : http://127.0.0.1:%d/\n", g_hubPort);
+                    printf(L("  控制台   : http://127.0.0.1:%d/\n"), g_hubPort);
                 return;
             }
         }
         Sleep(150);
     }
-    printf("  [i] 注入已发起，但尚未收到监控端口的回报。\n");
-    printf("      可用 --list 稍后查看；若目标进程立即退出，请检查 DLL 是否为 x64。\n");
+    printf(L("  [i] 注入已发起，但尚未收到监控端口的回报。\n"));
+    printf(L("      可用 --list 稍后查看；若目标进程立即退出，请检查 DLL 是否为 x64。\n"));
 }
 
 static void banner(void)
 {
     printf("\n");
-    printf("  ProcWatch v" PW_VERSION "  -  进程行为监控\n");
+    /* The version is an argument rather than a concatenated literal: a wrapped
+     * literal cannot take part in compile-time concatenation, and keeping it
+     * out of the format string makes the translatable unit unambiguous. */
+    printf(L("  ProcWatch v%s  -  进程行为监控\n"), PW_VERSION);
     printf("  ==========================================\n\n");
 }
 
 static void usage(void)
 {
     banner();
-    printf("  用法:\n");
-    printf("    injector.exe --exe <程序路径> [参数...]     启动并注入\n");
-    printf("    injector.exe --pid <PID>                    注入到运行中的进程\n");
-    printf("    injector.exe --list                         列出已监控进程\n");
-    printf("    injector.exe --hub [--hub-port N]           启动聚合控制台\n\n");
-    printf("  选项:\n");
-    printf("    --dll <路径>      要注入的 DLL（默认与本程序同目录的 ProcWatch.dll）\n");
-    printf("    --gui=0|1         进程内监控窗口           默认 1\n");
-    printf("    --http=0|1        内嵌 WebUI 服务器        默认 1\n");
-    printf("    --port=N          指定 WebUI 端口          默认自动\n");
-    printf("    --log=0|1         同时写事件日志文件       默认 0\n");
-    printf("    --previews=0|1    记录读写/收发的数据预览  默认 0\n");
-    printf("    --risk=0|1        启用可疑行为规则         默认 1\n");
-    printf("    --verbose=0|1     记录高频 API（如 GetProcAddress 全部调用）\n");
-    printf("    --ring=N          事件环形缓冲条数         默认 8192\n");
-    printf("    --no-elevate      目标要求管理员权限时不自动提权\n");
-    printf("    --wait            注入后保持前台运行（配合 --hub 使用）\n\n");
-    printf("  示例:\n");
+    printf(L("  用法:\n"));
+    printf(L("    injector.exe --exe <程序路径> [参数...]     启动并注入\n"));
+    printf(L("    injector.exe --pid <PID>                    注入到运行中的进程\n"));
+    printf(L("    injector.exe --list                         列出已监控进程\n"));
+    printf(L("    injector.exe --hub [--hub-port N]           启动聚合控制台\n\n"));
+    printf(L("  选项:\n"));
+    printf(L("    --dll <路径>      要注入的 DLL（默认与本程序同目录的 ProcWatch.dll）\n"));
+    printf(L("    --gui=0|1         进程内监控窗口           默认 1\n"));
+    printf(L("    --http=0|1        内嵌 WebUI 服务器        默认 1\n"));
+    printf(L("    --port=N          指定 WebUI 端口          默认自动\n"));
+    printf(L("    --log=0|1         同时写事件日志文件       默认 0\n"));
+    printf(L("    --previews=0|1    记录读写/收发的数据预览  默认 0\n"));
+    printf(L("    --risk=0|1        启用可疑行为规则         默认 1\n"));
+    printf(L("    --verbose=0|1     记录高频 API（如 GetProcAddress 全部调用）\n"));
+    printf(L("    --ring=N          事件环形缓冲条数         默认 8192\n"));
+    printf(L("    --no-elevate      目标要求管理员权限时不自动提权\n"));
+    printf(L("    --lang=auto|zh|en 界面语言                         默认 auto\n"));
+    printf(L("    --wait            注入后保持前台运行（配合 --hub 使用）\n\n"));
+    printf(L("  示例:\n"));
     printf("    injector.exe --hub\n");
     printf("    injector.exe --exe C:\\Windows\\System32\\notepad.exe --hub\n");
     printf("    injector.exe --pid 4321 --previews=1\n\n");
-    printf("  说明:\n");
-    printf("    目标程序若声明需要管理员权限（清单里的 requireAdministrator），\n");
-    printf("    本程序会自动通过 UAC 以管理员身份重启；注入到这类进程同理。\n\n");
+    printf(L("  说明:\n"));
+    printf(L("    目标程序若声明需要管理员权限（清单里的 requireAdministrator），\n"));
+    printf(L("    本程序会自动通过 UAC 以管理员身份重启；注入到这类进程同理。\n\n"));
 }
 
 /* --------------------------------------------------------------------- main */
@@ -705,6 +715,16 @@ int main(int argc, char **argv)
      * would otherwise never flush. */
     setvbuf(stdout, NULL, _IONBF, 0);
     pw_config_defaults(&g_cfg);
+
+    /* Resolve the language before anything prints: --lang may well come after
+     * --help on the command line, and the help text is what was asked for. */
+    for (i = 1; i < argc; i++) {
+        if (!strncmp(argv[i], "--lang=", 7))
+            g_cfg.lang = pw_lang_parse(argv[i] + 7);
+        else if (!strcmp(argv[i], "--lang") && i + 1 < argc)
+            g_cfg.lang = pw_lang_parse(argv[i + 1]);
+    }
+    pw_lang_init(g_cfg.lang);
 
     /* Default to the DLL sitting next to injector.exe, not the current working
      * directory, which is rarely where the build output lives. */
@@ -771,6 +791,10 @@ int main(int argc, char **argv)
         } else if (!strncmp(a, "--ring=", 7)) {
             g_cfg.ring = (unsigned)atoi(a + 7);
             if (g_cfg.ring < 256) g_cfg.ring = 256;
+        } else if (!strncmp(a, "--lang=", 7)) {
+            g_cfg.lang = pw_lang_parse(a + 7);
+        } else if (!strcmp(a, "--lang") && i + 1 < argc) {
+            g_cfg.lang = pw_lang_parse(argv[++i]);
         } else if (!strcmp(a, "-h") || !strcmp(a, "--help") || !strcmp(a, "/?")) {
             usage();
             return 0;
@@ -780,6 +804,8 @@ int main(int argc, char **argv)
         }
     }
     childArgs[childArgc] = NULL;
+
+    pw_lang_init(g_cfg.lang);
 
     if (wantList) { banner(); print_instances(); return 0; }
 
@@ -793,8 +819,8 @@ int main(int argc, char **argv)
         if (n > 0 && n < sizeof(full)) pw_str_copy(g_dllPath, sizeof(g_dllPath), full);
         if (GetFileAttributesA(g_dllPath) == INVALID_FILE_ATTRIBUTES) {
             if (exeToRun || pid) {
-                fprintf(stderr, "[!] 找不到 DLL：%s\n", g_dllPath);
-                fprintf(stderr, "    请先运行 build.bat 生成 ProcWatch.dll，或用 --dll 指定路径。\n");
+                fprintf(stderr, L("[!] 找不到 DLL：%s\n"), g_dllPath);
+                fprintf(stderr, L("    请先运行 build.bat 生成 ProcWatch.dll，或用 --dll 指定路径。\n"));
                 return 1;
             }
         }
@@ -827,19 +853,19 @@ int main(int argc, char **argv)
         si.cb = sizeof(si);
         memset(&pi, 0, sizeof(pi));
 
-        printf("[*] 启动目标（挂起）：%s\n", cmdline);
+        printf(L("[*] 启动目标（挂起）：%s\n"), cmdline);
         if (!CreateProcessA(NULL, cmdline, NULL, NULL, FALSE,
                             CREATE_SUSPENDED | CREATE_NEW_CONSOLE,
                             NULL, NULL, &si, &pi)) {
             DWORD e = GetLastError();
             if (e == ERROR_ELEVATION_REQUIRED) {
-                fprintf(stderr, "[!] 目标要求管理员权限（错误码 740）。\n");
+                fprintf(stderr, L("[!] 目标要求管理员权限（错误码 740）。\n"));
                 if (allowElevate) try_relaunch_elevated();
-                else fprintf(stderr, "    请右键以管理员身份运行本程序后重试。\n");
+                else fprintf(stderr, L("    请右键以管理员身份运行本程序后重试。\n"));
             } else {
-                err("CreateProcess 失败：%s", cmdline);
+                err(L("CreateProcess 失败：%s"), cmdline);
                 if (e == ERROR_FILE_NOT_FOUND)
-                    fprintf(stderr, "    请检查程序路径是否存在。\n");
+                    fprintf(stderr, L("    请检查程序路径是否存在。\n"));
             }
             return 1;
         }
@@ -847,20 +873,20 @@ int main(int argc, char **argv)
         /* Create the handshake before injecting, so we cannot miss the signal. */
         readyEvent = create_ready_event(pi.dwProcessId);
 
-        printf("[*] 注入：%s\n", g_dllPath);
+        printf(L("[*] 注入：%s\n"), g_dllPath);
         if (inject_into(pi.dwProcessId, g_dllPath)) {
-            printf("[+] 注入成功。\n");
+            printf(L("[+] 注入成功。\n"));
             /* The target stays suspended until the import tables are repointed:
              * a compiler that hoisted an IAT load into a register before the
              * patch would otherwise keep calling the original function. */
             if (wait_ready(readyEvent, 15000)) {
-                printf("[+] 挂钩安装完成，恢复目标线程运行。\n");
+                printf(L("[+] 挂钩安装完成，恢复目标线程运行。\n"));
             } else {
                 readyEvent = NULL;
-                printf("[!] 等待挂钩安装超时，仍恢复目标运行（早期调用可能漏记）。\n");
+                printf(L("[!] 等待挂钩安装超时，仍恢复目标运行（早期调用可能漏记）。\n"));
             }
         } else {
-            printf("[!] 注入失败，目标将以未监控状态继续运行。\n");
+            printf(L("[!] 注入失败，目标将以未监控状态继续运行。\n"));
             if (readyEvent) { CloseHandle(readyEvent); readyEvent = NULL; }
         }
         ResumeThread(pi.hThread);
@@ -869,39 +895,39 @@ int main(int argc, char **argv)
         report_target(pi.dwProcessId);
         CloseHandle(pi.hProcess);
     } else if (pid) {
-        printf("[*] 注入进程 PID %lu\n", (unsigned long)pid);
+        printf(L("[*] 注入进程 PID %lu\n"), (unsigned long)pid);
         /* No environment to inherit, so hand the options over on disk. */
         pw_config_write_pending(&g_cfg);
         readyEvent = create_ready_event(pid);
         if (inject_into(pid, g_dllPath)) {
-            printf("[+] 注入成功。\n");
+            printf(L("[+] 注入成功。\n"));
             printf(wait_ready(readyEvent, 15000)
-                     ? "[+] 挂钩安装完成。\n"
-                     : "[!] 等待挂钩安装超时。\n");
+                     ? L("[+] 挂钩安装完成。\n")
+                     : L("[!] 等待挂钩安装超时。\n"));
             readyEvent = NULL;
             report_target(pid);
         } else {
             if (readyEvent) { CloseHandle(readyEvent); readyEvent = NULL; }
-            printf("[!] 注入失败。\n");
+            printf(L("[!] 注入失败。\n"));
             return 1;
         }
     }
 
     if (wantHub) {
         if (hub_start(hubPort)) {
-            printf("\n[*] 聚合控制台已启动：http://127.0.0.1:%d/\n", g_hubPort);
-            printf("    按 Ctrl+C 退出（退出不影响已注入的进程）。\n\n");
+            printf(L("\n[*] 聚合控制台已启动：http://127.0.0.1:%d/\n"), g_hubPort);
+            printf(L("    按 Ctrl+C 退出（退出不影响已注入的进程）。\n\n"));
             waitAfter = 1;
         } else {
-            fprintf(stderr, "[!] 无法绑定控制台端口 %d（可能已在运行）。\n", hubPort);
+            fprintf(stderr, L("[!] 无法绑定控制台端口 %d（可能已在运行）。\n"), hubPort);
         }
     }
 
     if (waitAfter && !wantHub) {
-        printf("\n[*] 按回车键退出（退出不会卸载已注入的 DLL）。\n");
+        printf(L("\n[*] 按回车键退出（退出不会卸载已注入的 DLL）。\n"));
         getchar();
     } else if (!wantHub) {
-        printf("\n[i] 提示：加 --hub 可同时启动聚合控制台，集中查看所有被监控进程。\n");
+        printf(L("\n[i] 提示：加 --hub 可同时启动聚合控制台，集中查看所有被监控进程。\n"));
     }
 
     if (waitAfter) {

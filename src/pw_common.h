@@ -69,6 +69,15 @@ typedef struct {
 #define PW_EF_FAILED  0x0002
 #define PW_EF_PREVIEW 0x0004     /* detail holds a data preview */
 
+/* ----------------------------------------------------------------- language */
+/* Which language the user-facing text comes out in. Declared here rather than
+ * in pw_lang.h because PW_CONFIG needs it and pw_lang.h includes this file. */
+enum {
+    PW_LANG_AUTO = 0,   /* follow the OS UI language */
+    PW_LANG_ZH,
+    PW_LANG_EN
+};
+
 /* -------------------------------------------------------------------- config */
 typedef struct {
     int  gui;            /* create the in-process window            (1) */
@@ -80,6 +89,7 @@ typedef struct {
     int  previews;       /* capture payload previews                (0) */
     int  wininet;        /* hook wininet/winhttp                    (1) */
     int  stack_trace;    /* record caller return address           (1) */
+    int  lang;           /* PW_LANG_AUTO / ZH / EN                  (auto) */
     unsigned int ring;   /* ring capacity in events              (8192) */
     int  disk_free_mb;   /* stop file logging below this            (64) */
     char log_dir[MAX_PATH];

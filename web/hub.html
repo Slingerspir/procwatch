@@ -64,20 +64,42 @@
 </div>
 <script>
 "use strict";
+
+/*PW_I18N_TABLE*/
+let LANG = "zh";
+const t = s => (LANG === "en" ? (PW_T[s] || s) : s);
+
+function translateDom() {
+  if (LANG !== "en") return;
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  for (const n of nodes) {
+    const raw = n.nodeValue, key = raw.trim();
+    if (key && PW_T[key]) n.nodeValue = raw.replace(key, PW_T[key]);
+  }
+}
+
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
 function dur(ms) {
   const s = Math.floor(ms / 1000), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60);
-  return (h ? h + " 时 " : "") + (m ? m + " 分 " : "") + (s % 60) + " 秒";
+  return (h ? h + t(" 时 ") : "") + (m ? m + t(" 分 ") : "") + (s % 60) + t(" 秒");
 }
 
 async function tick() {
   let list = [];
-  try { list = await (await fetch("/api/list")).json(); } catch (e) { }
+  try {
+    const data = await (await fetch("/api/list")).json();
+    /* The hub reports which language it speaks, so the page follows the
+     * injector instead of guessing. */
+    if (data.lang) { LANG = data.lang; translateDom(); }
+    list = data.instances || [];
+  } catch (e) { }
   const body = $("rows");
   if (!list.length) {
-    body.innerHTML = '<tr><td colspan="8" class="empty">没有发现已注入的进程。用 <span class="mono">injector.exe</span> 启动或注入一个目标程序。</td></tr>';
+    body.innerHTML = '<tr><td colspan="8" class="empty">' + t("没有发现已注入的进程。用 injector.exe 启动或注入一个目标程序。") + '</td></tr>';
     $("n").textContent = 0; $("tot").textContent = 0; $("susp").textContent = 0;
     return;
   }
@@ -93,11 +115,11 @@ async function tick() {
       + '<td class="mono">' + (it.events || 0) + '</td>'
       + '<td class="mono">' + (it.suspect ? '<span class="badge susp">' + it.suspect + '</span>' : "0") + '</td>'
       + '<td class="mono">' + dur(it.uptimeMs || 0) + '</td>'
-      + '<td>' + (live ? '<span class="badge live">运行中</span>' : '<span class="badge">已退出</span>') + '</td>'
+      + '<td>' + (live ? '<span class="badge live">' + t("运行中") + '</span>' : '<span class="badge">' + t("已退出") + '</span>') + '</td>'
       + '<td>' + (live
-          ? '<a href="' + href + '" target="_blank"><button>打开 WebUI</button></a> '
-            + '<button onclick="deact(' + it.pid + ')">停用</button>'
-          : '<button onclick="forget(' + it.pid + ')">清除记录</button>')
+          ? '<a href="' + href + '" target="_blank"><button>' + t("打开 WebUI") + '</button></a> '
+            + '<button onclick="deact(' + it.pid + ')">' + t("停用") + '</button>'
+          : '<button onclick="forget(' + it.pid + ')">' + t("清除记录") + '</button>')
       + '</td></tr>';
   }).join("");
   $("n").textContent = list.length;
@@ -106,7 +128,7 @@ async function tick() {
 }
 
 async function deact(pid) {
-  if (!confirm("停用 PID " + pid + " 的监控？\n将还原该进程内所有被改写的导入/导出表，监控停止。")) return;
+  if (!confirm(t("停用 PID ") + pid + t(" 的监控？\n将还原该进程内所有被改写的导入/导出表，监控停止。"))) return;
   await fetch("/api/deactivate?pid=" + pid, { method: "POST" });
   tick();
 }

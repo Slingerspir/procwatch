@@ -9,6 +9,7 @@
 #include "pw_rules.h"
 #include "pw_util.h"
 #include <string.h>
+#include "pw_lang.h"
 
 /* --- autostart / persistence locations -------------------------------- */
 static const char *const PERSIST[] = {
@@ -74,7 +75,7 @@ static void mark(PW_EVENT *ev, const char *why)
 {
     ev->lvl = PW_LVL_SUSPECT;
     if (ev->detail[0]) pw_str_cat(ev->detail, sizeof(ev->detail), "  ");
-    pw_str_cat(ev->detail, sizeof(ev->detail), "[规则] ");
+    pw_str_cat(ev->detail, sizeof(ev->detail), L("[规则] "));
     pw_str_cat(ev->detail, sizeof(ev->detail), why);
 }
 
@@ -82,7 +83,7 @@ static void note(PW_EVENT *ev, const char *why)
 {
     if (ev->lvl < PW_LVL_WARN) ev->lvl = PW_LVL_WARN;
     if (ev->detail[0]) pw_str_cat(ev->detail, sizeof(ev->detail), "  ");
-    pw_str_cat(ev->detail, sizeof(ev->detail), "[注] ");
+    pw_str_cat(ev->detail, sizeof(ev->detail), L("[注] "));
     pw_str_cat(ev->detail, sizeof(ev->detail), why);
 }
 
@@ -147,88 +148,88 @@ void pw_rules_apply(PW_EVENT *ev)
 
     case PW_CAT_FILE:
         if (writing && pw_path_matches_any(tgt, PERSIST, N_PERSIST)) {
-            mark(ev, "写入自启动/持久化位置");
+            mark(ev, L("写入自启动/持久化位置"));
             return;
         }
         if (pw_path_matches_any(tgt, SECRETS, N_SECRETS)) {
             /* A read counts here: reading a credential store is the behaviour
              * of interest, not just modifying it. */
-            mark(ev, "访问浏览器凭据/密码库/密钥文件");
+            mark(ev, L("访问浏览器凭据/密码库/密钥文件"));
             return;
         }
         if (pw_contains_i(tgt, "\\drivers\\etc\\hosts") && writing) {
-            mark(ev, "修改 hosts 文件（可能劫持域名）");
+            mark(ev, L("修改 hosts 文件（可能劫持域名）"));
             return;
         }
         if (writing && is_drop_path(tgt)) {
-            mark(ev, "在可写目录落地可执行文件");
+            mark(ev, L("在可写目录落地可执行文件"));
             return;
         }
         if (writing && pw_contains_i(tgt, "\\windows\\system32\\") &&
             pw_contains_i(api, "CreateFile")) {
-            note(ev, "在 System32 下创建/写入文件");
+            note(ev, L("在 System32 下创建/写入文件"));
             return;
         }
         if (pw_contains_i(api, "Delete") && pw_contains_i(tgt, "\\windows\\")) {
-            note(ev, "删除系统目录下的文件");
+            note(ev, L("删除系统目录下的文件"));
             return;
         }
         if (pw_contains_i(tgt, "\\shadow")) {
-            mark(ev, "疑似卷影副本操作（勒索软件常见手法）");
+            mark(ev, L("疑似卷影副本操作（勒索软件常见手法）"));
             return;
         }
         break;
 
     case PW_CAT_REG:
         if (writing && pw_path_matches_any(tgt, PERSIST, N_PERSIST)) {
-            mark(ev, "写入注册表自启动/服务项");
+            mark(ev, L("写入注册表自启动/服务项"));
             return;
         }
         if (writing && (pw_contains_i(tgt, "\\windows defender") ||
                         pw_contains_i(tgt, "\\policies\\microsoft\\windows defender"))) {
-            mark(ev, "改动 Windows Defender 配置/排除项");
+            mark(ev, L("改动 Windows Defender 配置/排除项"));
             return;
         }
         if (writing && (pw_contains_i(tgt, "\\currentversion\\internet settings") ||
                         pw_contains_i(tgt, "\\currentversion\\winhttp") ||
                         pw_contains_i(ev->detail, "proxy"))) {
-            note(ev, "注册表代理设置被修改");
+            note(ev, L("注册表代理设置被修改"));
             return;
         }
         break;
 
     case PW_CAT_NET:
         if (pw_contains_i(ev->detail, "SOCK_RAW")) {
-            mark(ev, "创建原始套接字（SOCK_RAW）");
+            mark(ev, L("创建原始套接字（SOCK_RAW）"));
             return;
         }
         /* Outbound destinations are classified inside the connect hook, which
          * still has the original sockaddr; here we only pick up name lookups. */
         if (pw_streqi(api, "gethostbyname") || pw_streqi(api, "getaddrinfo") ||
             pw_streqi(api, "GetAddrInfoW") || pw_streqi(api, "DnsQuery_A")) {
-            note(ev, "域名解析");
+            note(ev, L("域名解析"));
             return;
         }
         break;
 
     case PW_CAT_HTTP:
         if (pw_contains_i(tgt, "http://") && !pw_contains_i(tgt, "https://")) {
-            note(ev, "使用明文 HTTP 传输");
+            note(ev, L("使用明文 HTTP 传输"));
             return;
         }
         if (pw_contains_i(api, "Proxy") || pw_contains_i(ev->detail, "proxy")) {
-            note(ev, "代理相关调用");
+            note(ev, L("代理相关调用"));
             return;
         }
         if (pw_contains_i(ev->detail, "user-agent") &&
             (pw_contains_i(ev->detail, "curl") || pw_contains_i(ev->detail, "python") ||
              pw_contains_i(ev->detail, "wget") || pw_contains_i(ev->detail, "powershell"))) {
-            note(ev, "脚本类 User-Agent，疑似自动化下载");
+            note(ev, L("脚本类 User-Agent，疑似自动化下载"));
             return;
         }
         if (pw_contains_i(ev->detail, "content-type") &&
             pw_contains_i(ev->detail, "octet-stream")) {
-            note(ev, "下载二进制内容");
+            note(ev, L("下载二进制内容"));
             return;
         }
         break;
@@ -244,17 +245,17 @@ void pw_rules_apply(PW_EVENT *ev)
         if (pw_contains_i(ev->detail, "-enc") || pw_contains_i(ev->detail, "encodedcommand") ||
             pw_contains_i(ev->detail, "-e ") || pw_contains_i(ev->detail, "frombase64string") ||
             pw_contains_i(ev->detail, "-w hidden") || pw_contains_i(ev->detail, "bypass")) {
-            mark(ev, "命令行包含编码/隐藏执行参数");
+            mark(ev, L("命令行包含编码/隐藏执行参数"));
             return;
         }
         for (i = 0; i < N_LOLBIN; i++) {
             if (pw_streqi(base, LOLBINS[i])) {
-                note(ev, "启动系统自带工具，可能是无文件落地执行");
+                note(ev, L("启动系统自带工具，可能是无文件落地执行"));
                 return;
             }
         }
         if (is_drop_path(exe)) {
-            mark(ev, "从可写目录启动可执行文件");
+            mark(ev, L("从可写目录启动可执行文件"));
             return;
         }
         break;
@@ -262,11 +263,11 @@ void pw_rules_apply(PW_EVENT *ev)
 
     case PW_CAT_MOD:
         if (is_drop_path(tgt)) {
-            mark(ev, "加载临时/用户目录下的 DLL");
+            mark(ev, L("加载临时/用户目录下的 DLL"));
             return;
         }
         if (pw_contains_i(tgt, "appdata") && pw_ends_with_i(tgt, ".dll")) {
-            note(ev, "从用户目录加载模块");
+            note(ev, L("从用户目录加载模块"));
             return;
         }
         break;
@@ -276,21 +277,21 @@ void pw_rules_apply(PW_EVENT *ev)
             /* A protect call is a transition, not an allocation: report which
              * way it went rather than reusing the allocation wording. */
             if (pw_contains_i(ev->detail, "-> PAGE_EXECUTE"))
-                mark(ev, "把已有内存改为可执行");
+                mark(ev, L("把已有内存改为可执行"));
             return;
         }
         if (pw_contains_i(ev->detail, "PAGE_EXECUTE_READWRITE")) {
-            mark(ev, "申请可写可执行内存（shellcode 注入常见手法）");
+            mark(ev, L("申请可写可执行内存（shellcode 注入常见手法）"));
             return;
         }
         if (pw_contains_i(api, "WriteProcessMemory")) {
-            mark(ev, "写入其它进程的内存");
+            mark(ev, L("写入其它进程的内存"));
             return;
         }
         if (pw_contains_i(api, "CreateRemoteThread") ||
             pw_contains_i(api, "QueueUserAPC") ||
             pw_contains_i(api, "SetThreadContext")) {
-            mark(ev, "向其它进程注入代码");
+            mark(ev, L("向其它进程注入代码"));
             return;
         }
         break;

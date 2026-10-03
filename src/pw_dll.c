@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "pw_lang.h"
 
 static HMODULE       g_dll_module = NULL;
 static HANDLE        g_init_thread = NULL;
@@ -45,11 +46,11 @@ static void report_environment(void)
         if (cfg.lpszProxyBypass)   pw_wide_to_utf8(cfg.lpszProxyBypass, bypass, sizeof(bypass));
 
         _snprintf(buf, sizeof(buf),
-                  "系统代理：%s%s%s%s%s%s",
-                  proxy[0] ? proxy : "(未配置)",
-                  bypass[0] ? "  绕过: " : "", bypass,
-                  autoUrl[0] ? "  自动配置脚本: " : "", autoUrl,
-                  cfg.fAutoDetect ? "  [自动检测已开启]" : "");
+                  L("系统代理：%s%s%s%s%s%s"),
+                  proxy[0] ? proxy : L("(未配置)"),
+                  bypass[0] ? L("  绕过: ") : "", bypass,
+                  autoUrl[0] ? L("  自动配置脚本: ") : "", autoUrl,
+                  cfg.fAutoDetect ? L("  [自动检测已开启]") : "");
         buf[sizeof(buf) - 1] = 0;
         pw_report_force(PW_CAT_SYS, PW_LVL_INFO, "SystemProxy", g_exe_name, buf, 0, 0);
 
@@ -61,14 +62,14 @@ static void report_environment(void)
     n = GetEnvironmentVariableA("HTTP_PROXY", env, sizeof(env));
     if (n == 0 || n >= sizeof(env)) n = GetEnvironmentVariableA("http_proxy", env, sizeof(env));
     if (n > 0 && n < sizeof(env)) {
-        _snprintf(buf, sizeof(buf), "环境变量 HTTP_PROXY = %s", env);
+        _snprintf(buf, sizeof(buf), L("环境变量 HTTP_PROXY = %s"), env);
         buf[sizeof(buf) - 1] = 0;
         pw_report_force(PW_CAT_SYS, PW_LVL_INFO, "EnvProxy", g_exe_name, buf, 0, 0);
     }
     n = GetEnvironmentVariableA("HTTPS_PROXY", env, sizeof(env));
     if (n == 0 || n >= sizeof(env)) n = GetEnvironmentVariableA("https_proxy", env, sizeof(env));
     if (n > 0 && n < sizeof(env)) {
-        _snprintf(buf, sizeof(buf), "环境变量 HTTPS_PROXY = %s", env);
+        _snprintf(buf, sizeof(buf), L("环境变量 HTTPS_PROXY = %s"), env);
         buf[sizeof(buf) - 1] = 0;
         pw_report_force(PW_CAT_SYS, PW_LVL_INFO, "EnvProxy", g_exe_name, buf, 0, 0);
     }
@@ -101,7 +102,7 @@ static void open_logfile(void)
     g_logfile = fopen(path, "wb");
     if (g_logfile) {
         char detail[400];
-        _snprintf(detail, sizeof(detail), "事件同时写入文件：%s", path);
+        _snprintf(detail, sizeof(detail), L("事件同时写入文件：%s"), path);
         detail[sizeof(detail) - 1] = 0;
         pw_report_force(PW_CAT_SYS, PW_LVL_INFO, "LogFile", g_exe_name, detail, 0, 0);
         g_logfile_cursor = pw_log_last_seq(&g_log);
@@ -167,8 +168,10 @@ static DWORD WINAPI init_thread(LPVOID param)
     pw_state_init();
     pw_trace("state init: exe=%s pid=%lu", g_exe_path, (unsigned long)g_pid);
     pw_config_load(&g_cfg);
-    pw_trace("config: gui=%d http=%d port=%d log=%d ring=%u",
-             g_cfg.gui, g_cfg.http, g_cfg.port, g_cfg.log_file, g_cfg.ring);
+    pw_lang_init(g_cfg.lang);
+    pw_trace("config: gui=%d http=%d port=%d log=%d ring=%u lang=%d",
+             g_cfg.gui, g_cfg.http, g_cfg.port, g_cfg.log_file, g_cfg.ring,
+             g_cfg.lang);
 
     if (!pw_log_init(&g_log, g_cfg.ring)) return 0;
     pw_trace("event ring ready (%u slots)", pw_log_count(&g_log));
@@ -176,7 +179,7 @@ static DWORD WINAPI init_thread(LPVOID param)
     g_active = 1;
 
     _snprintf(banner, sizeof(banner),
-              "监控已附加：%s (PID %lu)，用户 %s，事件缓存 %u 条",
+              L("监控已附加：%s (PID %lu)，用户 %s，事件缓存 %u 条"),
               g_exe_path, (unsigned long)g_pid, g_user, g_cfg.ring);
     banner[sizeof(banner) - 1] = 0;
     pw_report_force(PW_CAT_SYS, PW_LVL_INFO, "Attach", g_exe_name, banner, 0, 0);
@@ -208,12 +211,12 @@ static DWORD WINAPI init_thread(LPVOID param)
         if (pw_gui_start()) {
             pw_trace("gui window created");
             pw_report_force(PW_CAT_SYS, PW_LVL_INFO, "GuiStart", g_exe_name,
-                            "进程内监控窗口已创建（关闭窗口不影响后台采集）", 0, 0);
+                            L("进程内监控窗口已创建（关闭窗口不影响后台采集）"), 0, 0);
         } else {
             pw_trace("gui window NOT created");
             pw_report_force(PW_CAT_SYS, PW_LVL_WARN, "GuiStart", g_exe_name,
-                            "无法创建窗口（该进程可能没有桌面访问权限），"
-                            "请改用 WebUI", 0, 0);
+                            L("无法创建窗口（该进程可能没有桌面访问权限），"
+                            "请改用 WebUI"), 0, 0);
         }
     }
     pw_trace("entering watchdog loop");

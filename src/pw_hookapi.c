@@ -20,6 +20,7 @@
 #include <wininet.h>
 #include <shellapi.h>
 #include <string.h>
+#include "pw_lang.h"
 
 /* Short names for the shared helpers so the hook bodies stay readable. */
 #define observing()          pw_observing()
@@ -142,12 +143,12 @@ static int hcache_get(HANDLE h, char *out, int outsz)
             return 1;
         }
         if (GetFileType(h) == FILE_TYPE_PIPE) {
-            pw_str_copy(out, outsz, "(管道/命名管道)");
+            pw_str_copy(out, outsz, L("(管道/命名管道)"));
             hcache_put(h, out);
             return 1;
         }
         if (GetFileType(h) == FILE_TYPE_CHAR) {
-            pw_str_copy(out, outsz, "(字符设备/控制台)");
+            pw_str_copy(out, outsz, L("(字符设备/控制台)"));
             hcache_put(h, out);
             return 1;
         }
@@ -160,7 +161,7 @@ static int hcache_get(HANDLE h, char *out, int outsz)
 static void access_str(DWORD a, char *out, int n)
 {
     out[0] = 0;
-    if (a == 0 || a == GENERIC_READ) { pw_str_copy(out, n, a ? "READ" : "查询属性"); return; }
+    if (a == 0 || a == GENERIC_READ) { pw_str_copy(out, n, a ? "READ" : L("查询属性")); return; }
     if (a & GENERIC_READ)    pw_str_cat(out, n, "READ ");
     if (a & GENERIC_WRITE)   pw_str_cat(out, n, "WRITE ");
     if (a & FILE_APPEND_DATA) pw_str_cat(out, n, "APPEND ");
@@ -191,7 +192,7 @@ static const char *root_key_name(HKEY k)
     if (k == HKEY_USERS)          return "HKU";
     if (k == HKEY_CURRENT_CONFIG) return "HKCC";
     if (k == HKEY_PERFORMANCE_DATA) return "HKPD";
-    return "(子键)";
+    return L("(子键)");
 }
 
 /* Resolve the full path behind a registry handle. NtQueryKey with
@@ -213,17 +214,17 @@ static void reg_key_path(HKEY key, char *out, int n)
     const wchar_t *name;
 
     out[0] = 0;
-    if (!key) { pw_str_copy(out, n, "(空键)"); return; }
+    if (!key) { pw_str_copy(out, n, L("(空键)")); return; }
 
     if (!g_NtQueryKey_tried) {
         HMODULE nt = GetModuleHandleA("ntdll.dll");
         g_NtQueryKey_tried = 1;
         if (nt) g_NtQueryKey = (PFN_NtQueryKey)(void *)GetProcAddress(nt, "NtQueryKey");
     }
-    if (!g_NtQueryKey) { pw_str_copy(out, n, "(注册表句柄)"); return; }
+    if (!g_NtQueryKey) { pw_str_copy(out, n, L("(注册表句柄)")); return; }
 
     if (g_NtQueryKey((HANDLE)key, PW_KEY_NAME_INFORMATION, buf, sizeof(buf), &need) != 0) {
-        pw_str_copy(out, n, "(注册表句柄)");
+        pw_str_copy(out, n, L("(注册表句柄)"));
         return;
     }
     nameLen = *(unsigned long *)(buf + 8);
@@ -248,7 +249,7 @@ static void reg_key_path(HKEY key, char *out, int n)
     }
 }
 
-#define REGSAM_STR(v) (((v) & KEY_WRITE) ? "写" : ((v) & KEY_READ) ? "读" : "查询")
+#define REGSAM_STR(v) (((v) & KEY_WRITE) ? L("写") : ((v) & KEY_READ) ? L("读") : L("查询"))
 
 /* Path for the pre-opened root-key form (RegOpenKeyExW / RegCreateKeyExW). */
 static void reg_path_root(HKEY root, LPCWSTR sub, char *out, int n)
@@ -297,12 +298,12 @@ static HANDLE WINAPI hook_CreateFileW(LPCWSTR name, DWORD access, DWORD share,
 
     if (obs) {
         char path[PW_TGT_LEN], det[PW_DET_LEN], acc[96];
-        if (!name) pw_str_copy(path, sizeof(path), "(空文件名)");
+        if (!name) pw_str_copy(path, sizeof(path), L("(空文件名)"));
         else pw_wide_to_utf8(name, path, sizeof(path));
         access_str(access, acc, sizeof(acc));
-        fmt(det, sizeof(det), "%s | 模式 %s | 共享 0x%X%s",
+        fmt(det, sizeof(det), L("%s | 模式 %s | 共享 0x%X%s"),
             acc, disp_str(disp), (unsigned)share,
-            (flags & FILE_FLAG_DELETE_ON_CLOSE) ? " | 关闭即删除" : "");
+            (flags & FILE_FLAG_DELETE_ON_CLOSE) ? L(" | 关闭即删除") : "");
         pw_report(PW_CAT_FILE,
                   (h == INVALID_HANDLE_VALUE) ? PW_LVL_WARN : PW_LVL_INFO,
                   "CreateFileW", path, det, 0, (int)GetLastError());
@@ -325,10 +326,10 @@ static HANDLE WINAPI hook_CreateFileA(LPCSTR name, DWORD access, DWORD share,
     if (obs) {
         char det[PW_DET_LEN], acc[96];
         access_str(access, acc, sizeof(acc));
-        fmt(det, sizeof(det), "%s | 模式 %s", acc, disp_str(disp));
+        fmt(det, sizeof(det), L("%s | 模式 %s"), acc, disp_str(disp));
         pw_report(PW_CAT_FILE,
                   (h == INVALID_HANDLE_VALUE) ? PW_LVL_WARN : PW_LVL_INFO,
-                  "CreateFileA", name ? name : "(空)", det, 0, (int)GetLastError());
+                  "CreateFileA", name ? name : L("(空)"), det, 0, (int)GetLastError());
         if (h != INVALID_HANDLE_VALUE && name) hcache_put(h, name);
     }
     SetLastError(err);
@@ -351,14 +352,14 @@ static BOOL WINAPI hook_ReadFile(HANDLE f, LPVOID buf, DWORD toRead,
         if (ok && got) {
             char pv[PW_DET_LEN];
             preview(buf, got, pv, sizeof(pv));
-            fmt(det, sizeof(det), "读取 %u 字节%s%s", (unsigned)got,
+            fmt(det, sizeof(det), L("读取 %u 字节%s%s"), (unsigned)got,
                 pv[0] ? "  " : "", pv);
         } else {
-            fmt(det, sizeof(det), "读取失败（请求 %u 字节，错误 %lu）",
+            fmt(det, sizeof(det), L("读取失败（请求 %u 字节，错误 %lu）"),
                 (unsigned)toRead, (unsigned long)GetLastError());
         }
         pw_report(PW_CAT_FILE, ok ? PW_LVL_INFO : PW_LVL_WARN,
-                  "ReadFile", path[0] ? path : "(未知句柄)", det, got,
+                  "ReadFile", path[0] ? path : L("(未知句柄)"), det, got,
                   (int)GetLastError());
     }
     SetLastError(err);
@@ -381,14 +382,14 @@ static BOOL WINAPI hook_WriteFile(HANDLE f, LPCVOID buf, DWORD toWrite,
         if (ok && put) {
             char pv[PW_DET_LEN];
             preview(buf, put, pv, sizeof(pv));
-            fmt(det, sizeof(det), "写入 %u 字节%s%s", (unsigned)put,
+            fmt(det, sizeof(det), L("写入 %u 字节%s%s"), (unsigned)put,
                 pv[0] ? "  " : "", pv);
         } else {
-            fmt(det, sizeof(det), "写入失败（请求 %u 字节，错误 %lu）",
+            fmt(det, sizeof(det), L("写入失败（请求 %u 字节，错误 %lu）"),
                 (unsigned)toWrite, (unsigned long)GetLastError());
         }
         pw_report(PW_CAT_FILE, ok ? PW_LVL_INFO : PW_LVL_WARN,
-                  "WriteFile", path[0] ? path : "(未知句柄)", det, put,
+                  "WriteFile", path[0] ? path : L("(未知句柄)"), det, put,
                   (int)GetLastError());
     }
     SetLastError(err);
@@ -405,7 +406,7 @@ static BOOL WINAPI hook_DeleteFileW(LPCWSTR name)
         char path[PW_TGT_LEN];
         pw_wide_to_utf8(name, path, sizeof(path));
         pw_report(PW_CAT_FILE, ok ? PW_LVL_WARN : PW_LVL_WARN, "DeleteFileW",
-                  path, ok ? "删除成功" : "删除失败", 0, (int)GetLastError());
+                  path, ok ? L("删除成功") : L("删除失败"), 0, (int)GetLastError());
     }
     SetLastError(err);
     return ok;
@@ -418,8 +419,8 @@ static BOOL WINAPI hook_DeleteFileA(LPCSTR name)
     int obs = observing();
     ok = real_DeleteFileA(name);
     if (obs)
-        pw_report(PW_CAT_FILE, PW_LVL_WARN, "DeleteFileA", name ? name : "(空)",
-                  ok ? "删除成功" : "删除失败", 0, (int)GetLastError());
+        pw_report(PW_CAT_FILE, PW_LVL_WARN, "DeleteFileA", name ? name : L("(空)"),
+                  ok ? L("删除成功") : L("删除失败"), 0, (int)GetLastError());
     SetLastError(err);
     return ok;
 }
@@ -434,8 +435,8 @@ static BOOL WINAPI hook_MoveFileExW(LPCWSTR from, LPCWSTR to, DWORD flags)
         char a[200], b[200], det[PW_DET_LEN];
         pw_wide_to_utf8(from, a, sizeof(a));
         pw_wide_to_utf8(to, b, sizeof(b));
-        fmt(det, sizeof(det), "重命名/移动到 %s%s", b,
-            (flags & MOVEFILE_REPLACE_EXISTING) ? " | 覆盖已存在文件" : "");
+        fmt(det, sizeof(det), L("重命名/移动到 %s%s"), b,
+            (flags & MOVEFILE_REPLACE_EXISTING) ? L(" | 覆盖已存在文件") : "");
         pw_report(PW_CAT_FILE, PW_LVL_WARN, "MoveFileExW", a, det, 0, (int)GetLastError());
     }
     SetLastError(err);
@@ -452,7 +453,7 @@ static BOOL WINAPI hook_CopyFileW(LPCWSTR from, LPCWSTR to, BOOL failIfExists)
         char a[200], b[200], det[PW_DET_LEN];
         pw_wide_to_utf8(from, a, sizeof(a));
         pw_wide_to_utf8(to, b, sizeof(b));
-        fmt(det, sizeof(det), "复制到 %s", b);
+        fmt(det, sizeof(det), L("复制到 %s"), b);
         pw_report(PW_CAT_FILE, PW_LVL_INFO, "CopyFileW", a, det, 0, (int)GetLastError());
     }
     SetLastError(err);
@@ -469,7 +470,7 @@ static BOOL WINAPI hook_CreateDirectoryW(LPCWSTR name, LPSECURITY_ATTRIBUTES sa)
         char path[PW_TGT_LEN];
         pw_wide_to_utf8(name, path, sizeof(path));
         pw_report(PW_CAT_FILE, PW_LVL_INFO, "CreateDirectoryW", path,
-                  ok ? "目录已创建" : "创建失败", 0, (int)GetLastError());
+                  ok ? L("目录已创建") : L("创建失败"), 0, (int)GetLastError());
     }
     SetLastError(err);
     return ok;
@@ -485,7 +486,7 @@ static BOOL WINAPI hook_RemoveDirectoryW(LPCWSTR name)
         char path[PW_TGT_LEN];
         pw_wide_to_utf8(name, path, sizeof(path));
         pw_report(PW_CAT_FILE, PW_LVL_WARN, "RemoveDirectoryW", path,
-                  ok ? "目录已删除" : "删除失败", 0, (int)GetLastError());
+                  ok ? L("目录已删除") : L("删除失败"), 0, (int)GetLastError());
     }
     SetLastError(err);
     return ok;
@@ -500,8 +501,8 @@ static HANDLE WINAPI hook_FindFirstFileW(LPCWSTR pattern, LPWIN32_FIND_DATAW dat
     if (obs) {
         char path[PW_TGT_LEN], det[PW_DET_LEN];
         pw_wide_to_utf8(pattern, path, sizeof(path));
-        fmt(det, sizeof(det), "枚举目录内容%s",
-            (h == INVALID_HANDLE_VALUE) ? "（无匹配）" : "");
+        fmt(det, sizeof(det), L("枚举目录内容%s"),
+            (h == INVALID_HANDLE_VALUE) ? L("（无匹配）") : "");
         pw_report(PW_CAT_FILE, PW_LVL_INFO, "FindFirstFileW", path, det, 0, (int)GetLastError());
     }
     SetLastError(err);
@@ -519,8 +520,8 @@ static HANDLE WINAPI hook_FindFirstFileExW(LPCWSTR pattern, FINDEX_INFO_LEVELS l
     if (obs) {
         char path[PW_TGT_LEN], det[PW_DET_LEN];
         pw_wide_to_utf8(pattern, path, sizeof(path));
-        fmt(det, sizeof(det), "枚举目录（%s）",
-            op == FindExSearchLimitToDirectories ? "仅目录" : "全部条目");
+        fmt(det, sizeof(det), L("枚举目录（%s）"),
+            op == FindExSearchLimitToDirectories ? L("仅目录") : L("全部条目"));
         pw_report(PW_CAT_FILE, PW_LVL_INFO, "FindFirstFileExW", path, det, 0, (int)GetLastError());
     }
     SetLastError(err);
@@ -536,9 +537,9 @@ static BOOL WINAPI hook_SetFileAttributesW(LPCWSTR name, DWORD attr)
     if (obs && (attr & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM))) {
         char path[PW_TGT_LEN], det[PW_DET_LEN];
         pw_wide_to_utf8(name, path, sizeof(path));
-        fmt(det, sizeof(det), "设置属性 0x%X%s%s", (unsigned)attr,
-            (attr & FILE_ATTRIBUTE_HIDDEN) ? " | 隐藏" : "",
-            (attr & FILE_ATTRIBUTE_SYSTEM) ? " | 系统" : "");
+        fmt(det, sizeof(det), L("设置属性 0x%X%s%s"), (unsigned)attr,
+            (attr & FILE_ATTRIBUTE_HIDDEN) ? L(" | 隐藏") : "",
+            (attr & FILE_ATTRIBUTE_SYSTEM) ? L(" | 系统") : "");
         pw_report(PW_CAT_FILE, PW_LVL_WARN, "SetFileAttributesW", path, det, 0, (int)GetLastError());
     }
     SetLastError(err);
@@ -586,22 +587,22 @@ static void reg_value_detail(DWORD type, const BYTE *data, DWORD size, char *det
     case REG_BINARY:    tn = "REG_BINARY"; break;
     case REG_MULTI_SZ:  tn = "REG_MULTI_SZ"; break;
     }
-    fmt(det, n, "类型 %s，%u 字节", tn, (unsigned)size);
+    fmt(det, n, L("类型 %s，%u 字节"), tn, (unsigned)size);
     if (g_cfg.previews && data && size) {
         if ((type == REG_SZ || type == REG_EXPAND_SZ || type == REG_MULTI_SZ) && size < 400) {
             char tmp[400];
             pw_wide_to_utf8((const wchar_t *)data, tmp, sizeof(tmp));
-            pw_str_cat(det, n, "  值: ");
+            pw_str_cat(det, n, L("  值: "));
             pw_str_cat(det, n, tmp);
         } else if (type == REG_DWORD && size >= 4) {
             char tmp[64];
-            fmt(tmp, sizeof(tmp), "  值: 0x%08X",
+            fmt(tmp, sizeof(tmp), L("  值: 0x%08X"),
                 (unsigned)*(const DWORD *)data);
             pw_str_cat(det, n, tmp);
         } else if (size <= 64) {
             char hex[260], tmp[300];
             pw_hex_ascii(data, (int)size, hex, sizeof(hex));
-            fmt(tmp, sizeof(tmp), "  值: %s", hex);
+            fmt(tmp, sizeof(tmp), L("  值: %s"), hex);
             pw_str_cat(det, n, tmp);
         }
     }
@@ -617,7 +618,7 @@ static LSTATUS WINAPI hook_RegOpenKeyExW(HKEY root, LPCWSTR sub, DWORD opt,
     if (obs && st == ERROR_SUCCESS) {
         char path[PW_TGT_LEN], det[PW_DET_LEN];
         reg_path_root(root, sub, path, sizeof(path));
-        fmt(det, sizeof(det), "以%s权限打开", REGSAM_STR(sam));
+        fmt(det, sizeof(det), L("以%s权限打开"), REGSAM_STR(sam));
         pw_report(PW_CAT_REG, PW_LVL_INFO, "RegOpenKeyExW", path, det, 0, 0);
     }
     SetLastError(err);
@@ -636,8 +637,8 @@ static LSTATUS WINAPI hook_RegCreateKeyExW(HKEY root, LPCWSTR sub, DWORD res,
     if (obs && st == ERROR_SUCCESS) {
         char path[PW_TGT_LEN], det[PW_DET_LEN];
         reg_path_root(root, sub, path, sizeof(path));
-        fmt(det, sizeof(det), "创建/打开注册表键（%s）",
-            (disp && *disp == REG_CREATED_NEW_KEY) ? "新建" : "已存在");
+        fmt(det, sizeof(det), L("创建/打开注册表键（%s）"),
+            (disp && *disp == REG_CREATED_NEW_KEY) ? L("新建") : L("已存在"));
         pw_report(PW_CAT_REG, PW_LVL_WARN, "RegCreateKeyExW", path, det, 0, 0);
     }
     SetLastError(err);
@@ -655,7 +656,7 @@ static LSTATUS WINAPI hook_RegSetValueExW(HKEY key, LPCWSTR name, DWORD res,
         char keypath[300], name8[200], path[PW_TGT_LEN], det[PW_DET_LEN];
         reg_key_path(key, keypath, sizeof(keypath));
         pw_wide_to_utf8(name, name8, sizeof(name8));
-        fmt(path, sizeof(path), "%s\\%s", keypath, name8[0] ? name8 : "(默认值)");
+        fmt(path, sizeof(path), "%s\\%s", keypath, name8[0] ? name8 : L("(默认值)"));
         reg_value_detail(type, data, size, det, sizeof(det));
         pw_report(PW_CAT_REG, PW_LVL_WARN, "RegSetValueExW", path, det, size, (int)st);
     }
@@ -674,11 +675,11 @@ static LSTATUS WINAPI hook_RegQueryValueExW(HKEY key, LPCWSTR name, LPDWORD res,
         char keypath[300], name8[200], path[PW_TGT_LEN], det[PW_DET_LEN];
         reg_key_path(key, keypath, sizeof(keypath));
         pw_wide_to_utf8(name, name8, sizeof(name8));
-        fmt(path, sizeof(path), "%s\\%s", keypath, name8[0] ? name8 : "(默认值)");
+        fmt(path, sizeof(path), "%s\\%s", keypath, name8[0] ? name8 : L("(默认值)"));
         if (st == ERROR_SUCCESS && type && data && size)
             reg_value_detail(*type, data, *size, det, sizeof(det));
         else
-            fmt(det, sizeof(det), "查询失败（错误 %ld）", (long)st);
+            fmt(det, sizeof(det), L("查询失败（错误 %ld）"), (long)st);
         pw_report(PW_CAT_REG, PW_LVL_INFO, "RegQueryValueExW", path, det,
                   size ? *size : 0, (int)st);
     }
@@ -696,9 +697,9 @@ static LSTATUS WINAPI hook_RegDeleteValueW(HKEY key, LPCWSTR name)
         char keypath[300], name8[200], path[PW_TGT_LEN];
         reg_key_path(key, keypath, sizeof(keypath));
         pw_wide_to_utf8(name, name8, sizeof(name8));
-        fmt(path, sizeof(path), "%s\\%s", keypath, name8[0] ? name8 : "(默认值)");
+        fmt(path, sizeof(path), "%s\\%s", keypath, name8[0] ? name8 : L("(默认值)"));
         pw_report(PW_CAT_REG, PW_LVL_WARN, "RegDeleteValueW", path,
-                  st == ERROR_SUCCESS ? "已删除" : "删除失败", 0, (int)st);
+                  st == ERROR_SUCCESS ? L("已删除") : L("删除失败"), 0, (int)st);
     }
     SetLastError(err);
     return st;
@@ -716,7 +717,7 @@ static LSTATUS WINAPI hook_RegDeleteKeyW(HKEY key, LPCWSTR sub)
         pw_wide_to_utf8(sub, sub8, sizeof(sub8));
         fmt(path, sizeof(path), "%s\\%s", keypath, sub8);
         pw_report(PW_CAT_REG, PW_LVL_WARN, "RegDeleteKeyW", path,
-                  st == ERROR_SUCCESS ? "已删除" : "删除失败", 0, (int)st);
+                  st == ERROR_SUCCESS ? L("已删除") : L("删除失败"), 0, (int)st);
     }
     SetLastError(err);
     return st;
@@ -734,7 +735,7 @@ static LSTATUS WINAPI hook_RegDeleteKeyExW(HKEY key, LPCWSTR sub, REGSAM sam, DW
         pw_wide_to_utf8(sub, sub8, sizeof(sub8));
         fmt(path, sizeof(path), "%s\\%s", keypath, sub8);
         pw_report(PW_CAT_REG, PW_LVL_WARN, "RegDeleteKeyExW", path,
-                  st == ERROR_SUCCESS ? "已删除（含子键）" : "删除失败", 0, (int)st);
+                  st == ERROR_SUCCESS ? L("已删除（含子键）") : L("删除失败"), 0, (int)st);
     }
     SetLastError(err);
     return st;
@@ -752,7 +753,7 @@ static LSTATUS WINAPI hook_RegOpenKeyExA(HKEY root, LPCSTR sub, DWORD opt,
     if (obs && st == ERROR_SUCCESS) {
         char path[PW_TGT_LEN], det[PW_DET_LEN];
         reg_path_root_a(root, sub, path, sizeof(path));
-        fmt(det, sizeof(det), "以%s权限打开（ANSI 接口）", REGSAM_STR(sam));
+        fmt(det, sizeof(det), L("以%s权限打开（ANSI 接口）"), REGSAM_STR(sam));
         pw_report(PW_CAT_REG, PW_LVL_INFO, "RegOpenKeyExA", path, det, 0, 0);
     }
     SetLastError(err);
@@ -771,8 +772,8 @@ static LSTATUS WINAPI hook_RegCreateKeyExA(HKEY root, LPCSTR sub, DWORD res,
     if (obs && st == ERROR_SUCCESS) {
         char path[PW_TGT_LEN], det[PW_DET_LEN];
         reg_path_root_a(root, sub, path, sizeof(path));
-        fmt(det, sizeof(det), "创建/打开注册表键（%s，ANSI 接口）",
-            (disp && *disp == REG_CREATED_NEW_KEY) ? "新建" : "已存在");
+        fmt(det, sizeof(det), L("创建/打开注册表键（%s，ANSI 接口）"),
+            (disp && *disp == REG_CREATED_NEW_KEY) ? L("新建") : L("已存在"));
         pw_report(PW_CAT_REG, PW_LVL_WARN, "RegCreateKeyExA", path, det, 0, 0);
     }
     SetLastError(err);
@@ -790,7 +791,7 @@ static LSTATUS WINAPI hook_RegSetValueExA(HKEY key, LPCSTR name, DWORD res,
         char keypath[300], name8[200], path[PW_TGT_LEN], det[PW_DET_LEN];
         reg_key_path(key, keypath, sizeof(keypath));
         pw_ansi_to_utf8(name, name8, sizeof(name8));
-        fmt(path, sizeof(path), "%s\\%s", keypath, name8[0] ? name8 : "(默认值)");
+        fmt(path, sizeof(path), "%s\\%s", keypath, name8[0] ? name8 : L("(默认值)"));
         reg_value_detail(type, data, size, det, sizeof(det));
         pw_report(PW_CAT_REG, PW_LVL_WARN, "RegSetValueExA", path, det, size, (int)st);
     }
@@ -809,11 +810,11 @@ static LSTATUS WINAPI hook_RegQueryValueExA(HKEY key, LPCSTR name, LPDWORD res,
         char keypath[300], name8[200], path[PW_TGT_LEN], det[PW_DET_LEN];
         reg_key_path(key, keypath, sizeof(keypath));
         pw_ansi_to_utf8(name, name8, sizeof(name8));
-        fmt(path, sizeof(path), "%s\\%s", keypath, name8[0] ? name8 : "(默认值)");
+        fmt(path, sizeof(path), "%s\\%s", keypath, name8[0] ? name8 : L("(默认值)"));
         if (st == ERROR_SUCCESS && type && data && size)
             reg_value_detail(*type, data, *size, det, sizeof(det));
         else
-            fmt(det, sizeof(det), "查询失败（错误 %ld）", (long)st);
+            fmt(det, sizeof(det), L("查询失败（错误 %ld）"), (long)st);
         pw_report(PW_CAT_REG, PW_LVL_INFO, "RegQueryValueExA", path, det,
                   size ? *size : 0, (int)st);
     }
@@ -831,9 +832,9 @@ static LSTATUS WINAPI hook_RegDeleteValueA(HKEY key, LPCSTR name)
         char keypath[300], name8[200], path[PW_TGT_LEN];
         reg_key_path(key, keypath, sizeof(keypath));
         pw_ansi_to_utf8(name, name8, sizeof(name8));
-        fmt(path, sizeof(path), "%s\\%s", keypath, name8[0] ? name8 : "(默认值)");
+        fmt(path, sizeof(path), "%s\\%s", keypath, name8[0] ? name8 : L("(默认值)"));
         pw_report(PW_CAT_REG, PW_LVL_WARN, "RegDeleteValueA", path,
-                  st == ERROR_SUCCESS ? "已删除" : "删除失败", 0, (int)st);
+                  st == ERROR_SUCCESS ? L("已删除") : L("删除失败"), 0, (int)st);
     }
     SetLastError(err);
     return st;
@@ -850,7 +851,7 @@ static LSTATUS WINAPI hook_RegDeleteKeyA(HKEY key, LPCSTR sub)
         pw_ansi_to_utf8(sub, sub8, sizeof(sub8));
         fmt(path, sizeof(path), "%s\\%s", root_key_name(key), sub8);
         pw_report(PW_CAT_REG, PW_LVL_WARN, "RegDeleteKeyA", path,
-                  st == ERROR_SUCCESS ? "已删除" : "删除失败", 0, (int)st);
+                  st == ERROR_SUCCESS ? L("已删除") : L("删除失败"), 0, (int)st);
     }
     SetLastError(err);
     return st;
@@ -882,7 +883,7 @@ static const char *sock_type_str(int t)
     case SOCK_STREAM: return "SOCK_STREAM";
     case SOCK_DGRAM:  return "SOCK_DGRAM";
     case SOCK_RAW:    return "SOCK_RAW";
-    default:          return "其它";
+    default:          return L("其它");
     }
 }
 
@@ -894,11 +895,11 @@ static SOCKET WSAAPI hook_socket(int af, int type, int proto)
     s = real_socket(af, type, proto);
     if (obs && s != INVALID_SOCKET) {
         char det[PW_DET_LEN];
-        fmt(det, sizeof(det), "协议族 %s，类型 %s，协议 %d",
-            af == AF_INET ? "IPv4" : af == AF_INET6 ? "IPv6" : "其它",
+        fmt(det, sizeof(det), L("协议族 %s，类型 %s，协议 %d"),
+            af == AF_INET ? "IPv4" : af == AF_INET6 ? "IPv6" : L("其它"),
             sock_type_str(type), proto);
         pw_report(PW_CAT_NET, (type == SOCK_RAW) ? PW_LVL_SUSPECT : PW_LVL_INFO,
-                  "socket", "(新建套接字)", det, 0, (int)s);
+                  "socket", L("(新建套接字)"), det, 0, (int)s);
     }
     SetLastError(err);
     return s;
@@ -913,7 +914,7 @@ static int WSAAPI hook_connect(SOCKET s, const struct sockaddr *name, int namele
     if (obs) {
         char addr[128], det[PW_DET_LEN];
         pw_format_sockaddr(name, namelen, addr, sizeof(addr));
-        fmt(det, sizeof(det), "%s连接%s", rc == 0 ? "" : "尝试", addr);
+        fmt(det, sizeof(det), L("%s连接%s"), rc == 0 ? "" : L("尝试"), addr);
         pw_report(PW_CAT_NET,
                   pw_sockaddr_is_local(name) ? PW_LVL_INFO : PW_LVL_WARN,
                   "connect", addr, det, 0, rc);
@@ -932,7 +933,7 @@ static int WSAAPI hook_WSAConnect(SOCKET s, const struct sockaddr *name, int nam
     if (obs) {
         char addr[128], det[PW_DET_LEN];
         pw_format_sockaddr(name, namelen, addr, sizeof(addr));
-        fmt(det, sizeof(det), "%s连接%s", rc == 0 ? "" : "尝试", addr);
+        fmt(det, sizeof(det), L("%s连接%s"), rc == 0 ? "" : L("尝试"), addr);
         pw_report(PW_CAT_NET,
                   pw_sockaddr_is_local(name) ? PW_LVL_INFO : PW_LVL_WARN,
                   "WSAConnect", addr, det, 0, rc);
@@ -950,8 +951,8 @@ static int WSAAPI hook_send(SOCKET s, const char *buf, int len, int flags)
     if (obs && rc > 0) {
         char det[PW_DET_LEN];
         preview(buf, (unsigned)rc, det, sizeof(det));
-        if (!det[0]) fmt(det, sizeof(det), "发送 %d 字节", rc);
-        pw_report(PW_CAT_NET, PW_LVL_INFO, "send", "(套接字发送)", det,
+        if (!det[0]) fmt(det, sizeof(det), L("发送 %d 字节"), rc);
+        pw_report(PW_CAT_NET, PW_LVL_INFO, "send", L("(套接字发送)"), det,
                   (unsigned)rc, rc);
     }
     SetLastError(err);
@@ -967,8 +968,8 @@ static int WSAAPI hook_recv(SOCKET s, char *buf, int len, int flags)
     if (obs && rc > 0) {
         char det[PW_DET_LEN];
         preview(buf, (unsigned)rc, det, sizeof(det));
-        if (!det[0]) fmt(det, sizeof(det), "接收 %d 字节", rc);
-        pw_report(PW_CAT_NET, PW_LVL_INFO, "recv", "(套接字接收)", det,
+        if (!det[0]) fmt(det, sizeof(det), L("接收 %d 字节"), rc);
+        pw_report(PW_CAT_NET, PW_LVL_INFO, "recv", L("(套接字接收)"), det,
                   (unsigned)rc, rc);
     }
     SetLastError(err);
@@ -988,8 +989,8 @@ static int WSAAPI hook_WSASend(SOCKET s, LPWSABUF bufs, DWORD nbufs, LPDWORD sen
         char det[PW_DET_LEN];
         for (i = 0; i < nbufs; i++) total += bufs[i].len;
         preview(bufs[0].buf, bufs[0].len, det, sizeof(det));
-        if (!det[0]) fmt(det, sizeof(det), "发送 %u 字节（%u 个缓冲）", (unsigned)total, (unsigned)nbufs);
-        pw_report(PW_CAT_NET, PW_LVL_INFO, "WSASend", "(套接字发送)", det, total, rc);
+        if (!det[0]) fmt(det, sizeof(det), L("发送 %u 字节（%u 个缓冲）"), (unsigned)total, (unsigned)nbufs);
+        pw_report(PW_CAT_NET, PW_LVL_INFO, "WSASend", L("(套接字发送)"), det, total, rc);
     }
     SetLastError(err);
     return rc;
@@ -1006,8 +1007,8 @@ static int WSAAPI hook_WSARecv(SOCKET s, LPWSABUF bufs, DWORD nbufs, LPDWORD got
     if (obs && bufs && nbufs && got && *got) {
         char det[PW_DET_LEN];
         preview(bufs[0].buf, *got, det, sizeof(det));
-        if (!det[0]) fmt(det, sizeof(det), "接收 %u 字节", (unsigned)*got);
-        pw_report(PW_CAT_NET, PW_LVL_INFO, "WSARecv", "(套接字接收)", det, *got, rc);
+        if (!det[0]) fmt(det, sizeof(det), L("接收 %u 字节"), (unsigned)*got);
+        pw_report(PW_CAT_NET, PW_LVL_INFO, "WSARecv", L("(套接字接收)"), det, *got, rc);
     }
     SetLastError(err);
     return rc;
@@ -1024,7 +1025,7 @@ static int WSAAPI hook_sendto(SOCKET s, const char *buf, int len, int flags,
         char addr[128], det[PW_DET_LEN];
         pw_format_sockaddr(to, tolen, addr, sizeof(addr));
         preview(buf, (unsigned)rc, det, sizeof(det));
-        if (!det[0]) fmt(det, sizeof(det), "发送 %d 字节", rc);
+        if (!det[0]) fmt(det, sizeof(det), L("发送 %d 字节"), rc);
         pw_str_cat(det, sizeof(det), "  -> ");
         pw_str_cat(det, sizeof(det), addr);
         pw_report(PW_CAT_NET, pw_sockaddr_is_local(to) ? PW_LVL_INFO : PW_LVL_WARN,
@@ -1045,7 +1046,7 @@ static int WSAAPI hook_recvfrom(SOCKET s, char *buf, int len, int flags,
         char addr[128], det[PW_DET_LEN];
         pw_format_sockaddr(from, fromlen ? *fromlen : 0, addr, sizeof(addr));
         preview(buf, (unsigned)rc, det, sizeof(det));
-        if (!det[0]) fmt(det, sizeof(det), "接收 %d 字节", rc);
+        if (!det[0]) fmt(det, sizeof(det), L("接收 %d 字节"), rc);
         pw_str_cat(det, sizeof(det), "  <- ");
         pw_str_cat(det, sizeof(det), addr);
         pw_report(PW_CAT_NET, PW_LVL_INFO, "recvfrom", addr, det, (unsigned)rc, rc);
@@ -1061,8 +1062,8 @@ static int WSAAPI hook_closesocket(SOCKET s)
     int obs = observing();
     rc = real_closesocket(s);
     if (obs)
-        pw_report(PW_CAT_NET, PW_LVL_INFO, "closesocket", "(关闭套接字)",
-                  rc == 0 ? "已关闭" : "关闭失败", 0, rc);
+        pw_report(PW_CAT_NET, PW_LVL_INFO, "closesocket", L("(关闭套接字)"),
+                  rc == 0 ? L("已关闭") : L("关闭失败"), 0, rc);
     SetLastError(err);
     return rc;
 }
@@ -1076,9 +1077,9 @@ static int WSAAPI hook_getaddrinfo(PCSTR node, PCSTR service,
     rc = real_getaddrinfo(node, service, hints, res);
     if (obs) {
         char det[PW_DET_LEN];
-        fmt(det, sizeof(det), "解析域名%s%s", service ? " 端口 " : "", service ? service : "");
+        fmt(det, sizeof(det), L("解析域名%s%s"), service ? L(" 端口 ") : "", service ? service : "");
         pw_report(PW_CAT_NET, PW_LVL_WARN, "getaddrinfo",
-                  node ? node : "(空)", det, 0, rc);
+                  node ? node : L("(空)"), det, 0, rc);
     }
     SetLastError(err);
     return rc;
@@ -1098,12 +1099,12 @@ static INT WSAAPI hook_GetAddrInfoW(PCWSTR node, PCWSTR service,
         if (service) {
             char svc[64];
             pw_wide_to_utf8(service, svc, sizeof(svc));
-            fmt(det, sizeof(det), "解析域名，端口 %s", svc);
+            fmt(det, sizeof(det), L("解析域名，端口 %s"), svc);
         } else {
-            pw_str_copy(det, sizeof(det), "解析域名");
+            pw_str_copy(det, sizeof(det), L("解析域名"));
         }
         pw_report(PW_CAT_NET, PW_LVL_WARN, "GetAddrInfoW",
-                  host[0] ? host : "(空)", det, 0, rc);
+                  host[0] ? host : L("(空)"), det, 0, rc);
     }
     SetLastError(err);
     return rc;
@@ -1117,7 +1118,7 @@ static struct hostent *WSAAPI hook_gethostbyname(const char *name)
     he = real_gethostbyname(name);
     if (obs)
         pw_report(PW_CAT_NET, PW_LVL_WARN, "gethostbyname",
-                  name ? name : "(空)", "解析域名（旧接口）", 0, he ? 0 : -1);
+                  name ? name : L("(空)"), L("解析域名（旧接口）"), 0, he ? 0 : -1);
     SetLastError(err);
     return he;
 }
@@ -1147,15 +1148,15 @@ static HINTERNET WINAPI hook_InternetOpenW(LPCWSTR agent, DWORD access, LPCWSTR 
         char ua[300], px[300], det[PW_DET_LEN];
         pw_wide_to_utf8(agent, ua, sizeof(ua));
         pw_wide_to_utf8(proxy, px, sizeof(px));
-        fmt(det, sizeof(det), "User-Agent: %s", ua[0] ? ua : "(默认)");
+        fmt(det, sizeof(det), "User-Agent: %s", ua[0] ? ua : L("(默认)"));
         if (access == INTERNET_OPEN_TYPE_PROXY) {
-            pw_str_cat(det, sizeof(det), "  |  显式使用代理: ");
-            pw_str_cat(det, sizeof(det), px[0] ? px : "(未提供)");
+            pw_str_cat(det, sizeof(det), L("  |  显式使用代理: "));
+            pw_str_cat(det, sizeof(det), px[0] ? px : L("(未提供)"));
         } else if (access == INTERNET_OPEN_TYPE_PRECONFIG) {
-            pw_str_cat(det, sizeof(det), "  |  使用系统代理配置");
+            pw_str_cat(det, sizeof(det), L("  |  使用系统代理配置"));
         }
         pw_report(PW_CAT_HTTP, PW_LVL_INFO, "InternetOpenW",
-                  ua[0] ? ua : "(WinINet 会话)", det, 0, 0);
+                  ua[0] ? ua : L("(WinINet 会话)"), det, 0, 0);
     }
     SetLastError(err);
     return h;
@@ -1170,15 +1171,15 @@ static HINTERNET WINAPI hook_InternetOpenA(LPCSTR agent, DWORD access, LPCSTR pr
     h = real_InternetOpenA(agent, access, proxy, bypass, flags);
     if (obs) {
         char det[PW_DET_LEN];
-        fmt(det, sizeof(det), "User-Agent: %s", agent ? agent : "(默认)");
+        fmt(det, sizeof(det), "User-Agent: %s", agent ? agent : L("(默认)"));
         if (access == INTERNET_OPEN_TYPE_PROXY) {
-            pw_str_cat(det, sizeof(det), "  |  显式使用代理: ");
-            pw_str_cat(det, sizeof(det), proxy ? proxy : "(未提供)");
+            pw_str_cat(det, sizeof(det), L("  |  显式使用代理: "));
+            pw_str_cat(det, sizeof(det), proxy ? proxy : L("(未提供)"));
         } else if (access == INTERNET_OPEN_TYPE_PRECONFIG) {
-            pw_str_cat(det, sizeof(det), "  |  使用系统代理配置");
+            pw_str_cat(det, sizeof(det), L("  |  使用系统代理配置"));
         }
         pw_report(PW_CAT_HTTP, PW_LVL_INFO, "InternetOpenA",
-                  agent ? agent : "(WinINet 会话)", det, 0, 0);
+                  agent ? agent : L("(WinINet 会话)"), det, 0, 0);
     }
     SetLastError(err);
     return h;
@@ -1198,11 +1199,11 @@ static HINTERNET WINAPI hook_InternetConnectW(HINTERNET net, LPCWSTR server,
         pw_wide_to_utf8(server, srv, sizeof(srv));
         pw_wide_to_utf8(user, usr, sizeof(usr));
         fmt(tgt, sizeof(tgt), "%s:%u", srv, (unsigned)port);
-        fmt(det, sizeof(det), "%s连接，服务类型 %s%s%s",
-            h ? "" : "尝试",
+        fmt(det, sizeof(det), L("%s连接，服务类型 %s%s%s"),
+            h ? "" : L("尝试"),
             service == INTERNET_SERVICE_HTTP ? "HTTP" :
-            service == INTERNET_SERVICE_FTP ? "FTP" : "其它",
-            usr[0] ? "，用户名 " : "", usr);
+            service == INTERNET_SERVICE_FTP ? "FTP" : L("其它"),
+            usr[0] ? L("，用户名 ") : "", usr);
         pw_report(PW_CAT_HTTP, PW_LVL_INFO, "InternetConnectW", tgt, det, 0, 0);
     }
     SetLastError(err);
@@ -1219,9 +1220,9 @@ static HINTERNET WINAPI hook_InternetOpenUrlW(HINTERNET net, LPCWSTR url, LPCWST
     if (obs) {
         char u[PW_TGT_LEN], det[PW_DET_LEN];
         pw_wide_to_utf8(url, u, sizeof(u));
-        pw_str_copy(det, sizeof(det), "直接打开 URL 并读取响应");
+        pw_str_copy(det, sizeof(det), L("直接打开 URL 并读取响应"));
         pw_report(PW_CAT_HTTP, PW_LVL_WARN, "InternetOpenUrlW",
-                  u[0] ? u : "(空)", det, 0, 0);
+                  u[0] ? u : L("(空)"), det, 0, 0);
     }
     SetLastError(err);
     return h;
@@ -1240,8 +1241,8 @@ static HINTERNET WINAPI hook_HttpOpenRequestW(HINTERNET conn, LPCWSTR verb, LPCW
         pw_wide_to_utf8(verb, v, sizeof(v));
         pw_wide_to_utf8(object, o, sizeof(o));
         fmt(det, sizeof(det), "%s %s%s%s", v[0] ? v : "GET", o,
-            (flags & INTERNET_FLAG_SECURE) ? "  |  HTTPS" : "  |  明文 HTTP",
-            (flags & INTERNET_FLAG_NO_CACHE_WRITE) ? "  |  不写缓存" : "");
+            (flags & INTERNET_FLAG_SECURE) ? "  |  HTTPS" : L("  |  明文 HTTP"),
+            (flags & INTERNET_FLAG_NO_CACHE_WRITE) ? L("  |  不写缓存") : "");
         pw_report(PW_CAT_HTTP, PW_LVL_INFO, "HttpOpenRequestW",
                   o[0] ? o : "/", det, 0, 0);
     }
@@ -1263,9 +1264,9 @@ static BOOL WINAPI hook_HttpSendRequestW(HINTERNET req, LPCWSTR headers, DWORD h
             pw_wide_to_utf8(headers, h8, sizeof(h8));
             summarise_headers(h8, det, sizeof(det));
         }
-        if (!det[0]) pw_str_copy(det, sizeof(det), "发送 HTTP 请求");
+        if (!det[0]) pw_str_copy(det, sizeof(det), L("发送 HTTP 请求"));
         pw_report(PW_CAT_HTTP, ok ? PW_LVL_INFO : PW_LVL_WARN,
-                  "HttpSendRequestW", "(HTTP 请求)", det, optlen, ok ? 0 : -1);
+                  "HttpSendRequestW", L("(HTTP 请求)"), det, optlen, ok ? 0 : -1);
     }
     SetLastError(err);
     return ok;
@@ -1283,12 +1284,12 @@ static BOOL WINAPI hook_InternetReadFile(HINTERNET req, LPVOID buf, DWORD toRead
         char det[PW_DET_LEN];
         if (n) {
             preview(buf, n, det, sizeof(det));
-            if (!det[0]) fmt(det, sizeof(det), "读取响应体 %u 字节", (unsigned)n);
+            if (!det[0]) fmt(det, sizeof(det), L("读取响应体 %u 字节"), (unsigned)n);
         } else {
-            pw_str_copy(det, sizeof(det), ok ? "响应结束" : "读取失败");
+            pw_str_copy(det, sizeof(det), ok ? L("响应结束") : L("读取失败"));
         }
         pw_report(PW_CAT_HTTP, PW_LVL_INFO, "InternetReadFile",
-                  "(HTTP 响应)", det, n, ok ? 0 : -1);
+                  L("(HTTP 响应)"), det, n, ok ? 0 : -1);
     }
     SetLastError(err);
     return ok;
@@ -1302,23 +1303,23 @@ static BOOL WINAPI hook_InternetSetOptionW(HINTERNET h, DWORD opt, LPVOID buf, D
     ok = real_InternetSetOptionW(h, opt, buf, len);
     if (obs) {
         char det[PW_DET_LEN], tgt[128];
-        fmt(tgt, sizeof(tgt), "WinINet 选项 %u", (unsigned)opt);
+        fmt(tgt, sizeof(tgt), L("WinINet 选项 %u"), (unsigned)opt);
         switch (opt) {
         case INTERNET_OPTION_PROXY:
-            pw_str_copy(det, sizeof(det), "修改代理设置");
+            pw_str_copy(det, sizeof(det), L("修改代理设置"));
             if (buf && len && ((LPVOID *)buf)[0] == NULL) {
-                pw_str_cat(det, sizeof(det), "（清除代理）");
+                pw_str_cat(det, sizeof(det), L("（清除代理）"));
             }
             pw_report(PW_CAT_HTTP, PW_LVL_SUSPECT, "InternetSetOptionW", tgt, det, len, ok);
             break;
         case INTERNET_OPTION_SETTINGS_CHANGED:
         case INTERNET_OPTION_PROXY_SETTINGS_CHANGED:
         case INTERNET_OPTION_REFRESH:
-            pw_str_copy(det, sizeof(det), "刷新代理配置缓存");
+            pw_str_copy(det, sizeof(det), L("刷新代理配置缓存"));
             pw_report(PW_CAT_HTTP, PW_LVL_WARN, "InternetSetOptionW", tgt, det, len, ok);
             break;
         case INTERNET_OPTION_USER_AGENT:
-            pw_str_copy(det, sizeof(det), "设置 User-Agent");
+            pw_str_copy(det, sizeof(det), L("设置 User-Agent"));
             pw_report(PW_CAT_HTTP, PW_LVL_INFO, "InternetSetOptionW", tgt, det, len, ok);
             break;
         default:
@@ -1352,14 +1353,14 @@ static void log_process(const char *api, const wchar_t *app, const wchar_t *cmd,
     pw_wide_to_utf8(app, a8, sizeof(a8));
     pw_wide_to_utf8(cmd, c8, sizeof(c8));
     shown = c8[0] ? c8 : a8;
-    if (!shown[0]) shown = "(空命令行)";
+    if (!shown[0]) shown = L("(空命令行)");
 
-    fmt(det, sizeof(det), "%s新进程 PID %lu%s%s%s%s",
-        ok ? "" : "尝试创建", (unsigned long)pid,
-        (flags & CREATE_SUSPENDED) ? "  |  挂起启动" : "",
-        (flags & DETACHED_PROCESS) ? "  |  无控制台" : "",
-        (flags & CREATE_NO_WINDOW) ? "  |  隐藏窗口" : "",
-        (flags & CREATE_NEW_CONSOLE) ? "  |  新控制台" : "");
+    fmt(det, sizeof(det), L("%s新进程 PID %lu%s%s%s%s"),
+        ok ? "" : L("尝试创建"), (unsigned long)pid,
+        (flags & CREATE_SUSPENDED) ? L("  |  挂起启动") : "",
+        (flags & DETACHED_PROCESS) ? L("  |  无控制台") : "",
+        (flags & CREATE_NO_WINDOW) ? L("  |  隐藏窗口") : "",
+        (flags & CREATE_NEW_CONSOLE) ? L("  |  新控制台") : "");
     pw_report(PW_CAT_PROC, PW_LVL_WARN, api, shown, det, 0, ok ? 0 : -1);
 }
 
@@ -1407,10 +1408,10 @@ static UINT WINAPI hook_WinExec(LPCSTR cmd, UINT show)
     rc = real_WinExec(cmd, show);
     if (obs) {
         char det[PW_DET_LEN];
-        fmt(det, sizeof(det), "以 WinExec 启动，显示方式 %u%s", show,
-            (show == SW_HIDE) ? "  |  隐藏窗口" : "");
+        fmt(det, sizeof(det), L("以 WinExec 启动，显示方式 %u%s"), show,
+            (show == SW_HIDE) ? L("  |  隐藏窗口") : "");
         pw_report(PW_CAT_PROC, PW_LVL_WARN, "WinExec",
-                  cmd ? cmd : "(空)", det, 0, (int)rc);
+                  cmd ? cmd : L("(空)"), det, 0, (int)rc);
     }
     SetLastError(err);
     return rc;
@@ -1428,10 +1429,10 @@ static BOOL WINAPI hook_ShellExecuteExW(SHELLEXECUTEINFOW *info)
         pw_wide_to_utf8(info->lpParameters, p, sizeof(p));
         pw_wide_to_utf8(info->lpVerb, v, sizeof(v));
         if (p[0]) { pw_str_cat(f, sizeof(f), " "); pw_str_cat(f, sizeof(f), p); }
-        fmt(det, sizeof(det), "ShellExecute 动词 %s%s",
-            v[0] ? v : "open", (info->nShow == SW_HIDE) ? "  |  隐藏窗口" : "");
+        fmt(det, sizeof(det), L("ShellExecute 动词 %s%s"),
+            v[0] ? v : "open", (info->nShow == SW_HIDE) ? L("  |  隐藏窗口") : "");
         pw_report(PW_CAT_PROC, PW_LVL_WARN, "ShellExecuteExW",
-                  f[0] ? f : "(空)", det, 0, ok ? 0 : -1);
+                  f[0] ? f : L("(空)"), det, 0, ok ? 0 : -1);
     }
     SetLastError(err);
     return ok;
@@ -1506,10 +1507,10 @@ static void log_module_load(const char *api, const wchar_t *name, HMODULE mod, i
             pw_str_copy(path8, sizeof(path8), full);
         }
     }
-    fmt(det, sizeof(det), "%s加载模块%s", ok ? "" : "尝试",
-        fromUserDir ? "  |  来自用户可写目录" : "");
+    fmt(det, sizeof(det), L("%s加载模块%s"), ok ? "" : L("尝试"),
+        fromUserDir ? L("  |  来自用户可写目录") : "");
     pw_report(PW_CAT_MOD, fromUserDir ? PW_LVL_SUSPECT : PW_LVL_INFO,
-              api, path8[0] ? path8 : "(空)", det, 0, ok ? 0 : -1);
+              api, path8[0] ? path8 : L("(空)"), det, 0, ok ? 0 : -1);
 }
 
 static HMODULE WINAPI hook_LoadLibraryExW(LPCWSTR name, HANDLE file, DWORD flags)
@@ -1572,7 +1573,7 @@ static FARPROC WINAPI hook_GetProcAddress(HMODULE mod, LPCSTR name)
         if (replacement) {
             if (obs) {
                 char det[PW_DET_LEN];
-                fmt(det, sizeof(det), "动态解析的函数已被监控接管（真实地址 0x%p）",
+                fmt(det, sizeof(det), L("动态解析的函数已被监控接管（真实地址 0x%p）"),
                     (void *)p);
                 pw_report(PW_CAT_MOD, PW_LVL_WARN, "GetProcAddress",
                           name, det, 0, 0);
@@ -1584,8 +1585,8 @@ static FARPROC WINAPI hook_GetProcAddress(HMODULE mod, LPCSTR name)
 
     if (obs && name && (g_cfg.verbose || proc_is_sensitive(name))) {
         char det[PW_DET_LEN];
-        fmt(det, sizeof(det), "动态解析函数地址 0x%p%s", (void *)p,
-            p ? "" : "（失败）");
+        fmt(det, sizeof(det), L("动态解析函数地址 0x%p%s"), (void *)p,
+            p ? "" : L("（失败）"));
         pw_report(PW_CAT_MOD, PW_LVL_INFO, "GetProcAddress",
                   name, det, 0, p ? 0 : -1);
     }
@@ -1636,10 +1637,10 @@ static LPVOID WINAPI hook_VirtualAlloc(LPVOID addr, SIZE_T size, DWORD type, DWO
     if (obs && prot_has_exec(prot)) {
         char ps[160], det[PW_DET_LEN];
         prot_str(prot, ps, sizeof(ps));
-        fmt(det, sizeof(det), "申请 %llu 字节，权限 %s", (unsigned long long)size, ps);
+        fmt(det, sizeof(det), L("申请 %llu 字节，权限 %s"), (unsigned long long)size, ps);
         pw_report(PW_CAT_MEM,
                   (prot & PAGE_EXECUTE_READWRITE) ? PW_LVL_SUSPECT : PW_LVL_WARN,
-                  "VirtualAlloc", (p ? "已分配" : "分配失败"), det, (unsigned)size, 0);
+                  "VirtualAlloc", (p ? L("已分配") : L("分配失败")), det, (unsigned)size, 0);
     }
     SetLastError(err);
     return p;
@@ -1657,8 +1658,8 @@ static BOOL WINAPI hook_VirtualProtect(LPVOID addr, SIZE_T size, DWORD prot, PDW
         char a[160], b[160], det[PW_DET_LEN];
         prot_str(was, a, sizeof(a));
         prot_str(prot, b, sizeof(b));
-        fmt(det, sizeof(det), "%s -> %s，%llu 字节", a, b, (unsigned long long)size);
-        pw_report(PW_CAT_MEM, PW_LVL_WARN, "VirtualProtect", "(本进程内存)", det,
+        fmt(det, sizeof(det), L("%s -> %s，%llu 字节"), a, b, (unsigned long long)size);
+        pw_report(PW_CAT_MEM, PW_LVL_WARN, "VirtualProtect", L("(本进程内存)"), det,
                   (unsigned)size, ok ? 0 : -1);
     }
     SetLastError(err);
@@ -1675,9 +1676,9 @@ static LPVOID WINAPI hook_VirtualAllocEx(HANDLE proc, LPVOID addr, SIZE_T size,
     if (obs) {
         char ps[160], det[PW_DET_LEN];
         prot_str(prot, ps, sizeof(ps));
-        fmt(det, sizeof(det), "在 PID %lu 的地址空间申请 %llu 字节（%s）",
+        fmt(det, sizeof(det), L("在 PID %lu 的地址空间申请 %llu 字节（%s）"),
             (unsigned long)GetProcessId(proc), (unsigned long long)size, ps);
-        pw_report(PW_CAT_MEM, PW_LVL_SUSPECT, "VirtualAllocEx", "(目标进程)", det,
+        pw_report(PW_CAT_MEM, PW_LVL_SUSPECT, "VirtualAllocEx", L("(目标进程)"), det,
                   (unsigned)size, 0);
     }
     SetLastError(err);
@@ -1697,9 +1698,9 @@ static BOOL WINAPI hook_VirtualProtectEx(HANDLE proc, LPVOID addr, SIZE_T size,
         char a[160], b[160], det[PW_DET_LEN];
         prot_str(was, a, sizeof(a));
         prot_str(prot, b, sizeof(b));
-        fmt(det, sizeof(det), "PID %lu：%s -> %s，%llu 字节",
+        fmt(det, sizeof(det), L("PID %lu：%s -> %s，%llu 字节"),
             (unsigned long)GetProcessId(proc), a, b, (unsigned long long)size);
-        pw_report(PW_CAT_MEM, PW_LVL_SUSPECT, "VirtualProtectEx", "(目标进程)", det,
+        pw_report(PW_CAT_MEM, PW_LVL_SUSPECT, "VirtualProtectEx", L("(目标进程)"), det,
                   (unsigned)size, ok ? 0 : -1);
     }
     SetLastError(err);
@@ -1715,10 +1716,10 @@ static BOOL WINAPI hook_WriteProcessMemory(HANDLE proc, LPVOID addr, LPCVOID buf
     ok = real_WriteProcessMemory(proc, addr, buf, size, written);
     if (obs) {
         char det[PW_DET_LEN];
-        fmt(det, sizeof(det), "向 PID %lu 的 0x%p 写入 %llu 字节",
+        fmt(det, sizeof(det), L("向 PID %lu 的 0x%p 写入 %llu 字节"),
             (unsigned long)GetProcessId(proc), addr, (unsigned long long)size);
         pw_report(PW_CAT_MEM, PW_LVL_SUSPECT, "WriteProcessMemory",
-                  "(目标进程)", det, (unsigned)size, ok ? 0 : -1);
+                  L("(目标进程)"), det, (unsigned)size, ok ? 0 : -1);
     }
     SetLastError(err);
     return ok;
@@ -1734,10 +1735,10 @@ static HANDLE WINAPI hook_CreateRemoteThread(HANDLE proc, LPSECURITY_ATTRIBUTES 
     h = real_CreateRemoteThread(proc, sa, stack, start, param, flags, tid);
     if (obs) {
         char det[PW_DET_LEN];
-        fmt(det, sizeof(det), "在 PID %lu 中创建线程，入口 0x%p，参数 0x%p",
+        fmt(det, sizeof(det), L("在 PID %lu 中创建线程，入口 0x%p，参数 0x%p"),
             (unsigned long)GetProcessId(proc), (void *)start, param);
         pw_report(PW_CAT_MEM, PW_LVL_SUSPECT, "CreateRemoteThread",
-                  "(目标进程)", det, 0, h ? 0 : -1);
+                  L("(目标进程)"), det, 0, h ? 0 : -1);
     }
     SetLastError(err);
     return h;
@@ -1758,8 +1759,8 @@ static HANDLE WINAPI hook_OpenProcess(DWORD access, BOOL inherit, DWORD pid)
         if (access & PROCESS_VM_READ)       pw_str_cat(acc, sizeof(acc), "VM_READ ");
         if (access & PROCESS_CREATE_THREAD) pw_str_cat(acc, sizeof(acc), "CREATE_THREAD ");
         if (access & PROCESS_TERMINATE)     pw_str_cat(acc, sizeof(acc), "TERMINATE ");
-        fmt(det, sizeof(det), "打开 PID %lu，权限 %s", (unsigned long)pid, acc);
-        pw_report(PW_CAT_MEM, PW_LVL_SUSPECT, "OpenProcess", "(其它进程)", det, 0, 0);
+        fmt(det, sizeof(det), L("打开 PID %lu，权限 %s"), (unsigned long)pid, acc);
+        pw_report(PW_CAT_MEM, PW_LVL_SUSPECT, "OpenProcess", L("(其它进程)"), det, 0, 0);
     }
     SetLastError(err);
     return h;
@@ -1773,9 +1774,9 @@ static BOOL WINAPI hook_QueueUserAPC(PAPCFUNC fn, HANDLE thread, ULONG_PTR data)
     ok = real_QueueUserAPC(fn, thread, data);
     if (obs) {
         char det[PW_DET_LEN];
-        fmt(det, sizeof(det), "向线程插入 APC，回调 0x%p（早期注入常用手法）",
+        fmt(det, sizeof(det), L("向线程插入 APC，回调 0x%p（早期注入常用手法）"),
             (void *)fn);
-        pw_report(PW_CAT_MEM, PW_LVL_SUSPECT, "QueueUserAPC", "(目标线程)", det, 0,
+        pw_report(PW_CAT_MEM, PW_LVL_SUSPECT, "QueueUserAPC", L("(目标线程)"), det, 0,
                   ok ? 0 : -1);
     }
     SetLastError(err);

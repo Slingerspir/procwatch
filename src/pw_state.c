@@ -1,5 +1,6 @@
 /* pw_state.c */
 #include "pw_state.h"
+#include "pw_lang.h"
 #include "pw_util.h"
 #include "pw_rules.h"
 #include <stdarg.h>
@@ -57,13 +58,15 @@ static const char *const LVL_NAMES[] = PW_LVL_NAMES;
 const char *pw_cat_name(int cat)
 {
     if (cat < 0 || cat > PW_CAT_SYS) return "?";
-    return CAT_NAMES[cat];
+    /* The table itself keeps plain literals (a static initialiser cannot call
+     * pw_tr), so translation happens here, at the only point of use. */
+    return pw_tr(CAT_NAMES[cat]);
 }
 
 const char *pw_lvl_name(int lvl)
 {
     if (lvl < 0 || lvl > PW_LVL_SUSPECT) return "?";
-    return LVL_NAMES[lvl];
+    return pw_tr(LVL_NAMES[lvl]);
 }
 
 void pw_state_init(void)

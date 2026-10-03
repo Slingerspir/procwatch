@@ -1,5 +1,6 @@
 /* pw_config.c */
 #include "pw_config.h"
+#include "pw_lang.h"
 #include "pw_util.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,6 +18,7 @@ void pw_config_defaults(PW_CONFIG *cfg)
     cfg->previews    = 0;
     cfg->wininet     = 1;
     cfg->stack_trace = 1;
+    cfg->lang        = PW_LANG_AUTO;
     cfg->ring        = 8192;
     cfg->disk_free_mb = 64;
     pw_data_dir(cfg->log_dir, sizeof(cfg->log_dir));
@@ -80,6 +82,7 @@ void pw_config_parse(PW_CONFIG *cfg, const char *kv)
         else if (pw_streqi(key, "previews")) cfg->previews = cfg_bool(val);
         else if (pw_streqi(key, "wininet"))  cfg->wininet = cfg_bool(val);
         else if (pw_streqi(key, "trace"))    cfg->stack_trace = cfg_bool(val);
+        else if (pw_streqi(key, "lang"))     cfg->lang = pw_lang_parse(val);
         else if (pw_streqi(key, "ring"))     cfg->ring = val ? (unsigned)atoi(val) : cfg->ring;
         else if (pw_streqi(key, "logdir"))   pw_str_copy(cfg->log_dir, sizeof(cfg->log_dir), val ? val : "");
 
@@ -139,9 +142,11 @@ void pw_config_to_string(const PW_CONFIG *cfg, char *out, int outsz)
 {
     _snprintf(out, outsz,
               "gui=%d,http=%d,port=%d,log=%d,verbose=%d,risk=%d,previews=%d,"
-              "wininet=%d,trace=%d,ring=%u",
+              "wininet=%d,trace=%d,lang=%s,ring=%u",
               cfg->gui, cfg->http, cfg->port, cfg->log_file, cfg->verbose,
               cfg->risk, cfg->previews, cfg->wininet, cfg->stack_trace,
+              cfg->lang == PW_LANG_ZH ? "zh" :
+              cfg->lang == PW_LANG_EN ? "en" : "auto",
               cfg->ring);
     out[outsz - 1] = 0;
 }

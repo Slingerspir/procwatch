@@ -1,0 +1,409 @@
+# ProcWatch translations: <source literal>\t<english>
+#
+# The left column is the literal exactly as it appears in the C source,
+# escape sequences included; it is the lookup key at run time. Edit the
+# right column only, and keep every %-specifier in the same order - these
+# strings are printf formats, so a reordered specifier is a real bug.
+# tools/gen_lang.py reports entries the sources no longer use.
+[!] %s (错误码 %lu)\n	[!] %s (error %lu)\n
+\n[*] 目标需要管理员权限，正在以管理员身份重新启动注入器…\n	\n[*] the target requires administrator rights, restarting the injector elevated...\n
+    （会弹出 UAC 提示；新窗口里会继续同样的操作）\n\n	    (a UAC prompt will appear; the new window continues the same operation)\n\n
+[!] 已取消提权。请右键以管理员身份运行本程序后重试。\n	[!] Elevation cancelled. Right-click and run this program as administrator.\n
+[!] 提权启动失败（错误码 %lu）。请手动以管理员身份运行。\n	[!] Could not relaunch elevated (error %lu). Run this program as administrator manually.\n
+[*] 已在新的管理员窗口中继续，本窗口退出。\n	[*] Continuing in the new administrator window; this one is exiting.\n
+无法打开进程 %lu	cannot open process %lu
+目标进程内分配内存失败：%s	remote VirtualAllocEx failed: %s
+写入 DLL 路径失败：%s	writing the DLL path failed: %s
+CreateRemoteThread 失败，目标进程可能受保护：%s	CreateRemoteThread failed; the target may be protected: %s
+目标进程内 LoadLibrary 返回失败（位数不匹配或缺少依赖？）：%s	LoadLibrary failed inside the target (bitness mismatch, or a missing dependency?): %s
+(未知)	(unknown)
+没有发现已注入 ProcWatch 的进程。\n	No process with ProcWatch injected was found.\n
+进程	Process
+端口	Port
+事件	Events
+可疑	Suspect
+状态	State
+%llu时%llu分%llu秒	%lluh %llum %llus
+运行中	running
+已退出	exited
+  进程     : %s\n	  process  : %s\n
+  进程窗口 : 已在目标进程内创建（若该进程无桌面则只有 WebUI）\n	  window   : created inside the target (WebUI only if it has no desktop)\n
+  进程窗口 : 已禁用（--gui=0）\n	  window   : disabled (--gui=0)\n
+  控制台   : http://127.0.0.1:%d/\n	  hub      : http://127.0.0.1:%d/\n
+  [i] 注入已发起，但尚未收到监控端口的回报。\n	  [i] injection was issued but the monitor has not reported a port yet.\n
+      可用 --list 稍后查看；若目标进程立即退出，请检查 DLL 是否为 x64。\n	      Check again later with --list; if the target exits immediately, verify the DLL is x64.\n
+  用法:\n	  usage:\n
+    injector.exe --exe <程序路径> [参数...]     启动并注入\n	    injector.exe --exe <program> [args...]     launch and inject\n
+    injector.exe --pid <PID>                    注入到运行中的进程\n	    injector.exe --pid <PID>                   inject into a running process\n
+    injector.exe --list                         列出已监控进程\n	    injector.exe --list                        list instrumented processes\n
+    injector.exe --hub [--hub-port N]           启动聚合控制台\n\n	    injector.exe --hub [--hub-port N]          start the aggregation hub\n\n
+  选项:\n	  options:\n
+    --dll <路径>      要注入的 DLL（默认与本程序同目录的 ProcWatch.dll）\n	    --dll <path>      DLL to inject (default: ProcWatch.dll beside this exe)\n
+    --gui=0|1         进程内监控窗口           默认 1\n	    --gui=0|1         in-process monitor window           default 1\n
+    --http=0|1        内嵌 WebUI 服务器        默认 1\n	    --http=0|1        embedded web server                 default 1\n
+    --port=N          指定 WebUI 端口          默认自动\n	    --port=N          preferred WebUI port                default auto\n
+    --log=0|1         同时写事件日志文件       默认 0\n	    --log=0|1         mirror events to a file             default 0\n
+    --previews=0|1    记录读写/收发的数据预览  默认 0\n	    --previews=0|1    capture payload previews            default 0\n
+    --risk=0|1        启用可疑行为规则         默认 1\n	    --risk=0|1        heuristic risk rules                default 1\n
+    --verbose=0|1     记录高频 API（如 GetProcAddress 全部调用）\n	    --verbose=0|1     log high-frequency APIs (every GetProcAddress call)\n
+    --ring=N          事件环形缓冲条数         默认 8192\n	    --ring=N          event ring capacity                 default 8192\n
+    --no-elevate      目标要求管理员权限时不自动提权\n	    --no-elevate      do not auto-elevate for admin-only targets\n
+    --wait            注入后保持前台运行（配合 --hub 使用）\n\n	    --wait            stay in the foreground after injecting\n\n
+  示例:\n	  examples:\n
+  说明:\n	  notes:\n
+    目标程序若声明需要管理员权限（清单里的 requireAdministrator），\n	    If a target declares requireAdministrator in its manifest, this program\n
+    本程序会自动通过 UAC 以管理员身份重启；注入到这类进程同理。\n\n	    relaunches itself elevated through UAC. Injecting into one works the same way.\n\n
+[!] 找不到 DLL：%s\n	[!] DLL not found: %s\n
+    请先运行 build.bat 生成 ProcWatch.dll，或用 --dll 指定路径。\n	    Run build.bat first to produce ProcWatch.dll, or point --dll at it.\n
+[*] 启动目标（挂起）：%s\n	[*] launching target suspended: %s\n
+[!] 目标要求管理员权限（错误码 740）。\n	[!] The target requires administrator rights (error 740).\n
+    请右键以管理员身份运行本程序后重试。\n	    Right-click and run this program as administrator, then retry.\n
+CreateProcess 失败：%s	CreateProcess failed: %s
+    请检查程序路径是否存在。\n	    Check that the program path exists.\n
+[*] 注入：%s\n	[*] injecting: %s\n
+[+] 注入成功。\n	[+] injected.\n
+[+] 挂钩安装完成，恢复目标线程运行。\n	[+] hooks installed, resuming the target thread.\n
+[!] 等待挂钩安装超时，仍恢复目标运行（早期调用可能漏记）。\n	[!] Timed out waiting for hook installation; resuming anyway (early calls may be missed).\n
+[!] 注入失败，目标将以未监控状态继续运行。\n	[!] Injection failed; the target will run uninstrumented.\n
+[*] 注入进程 PID %lu\n	[*] injecting into PID %lu\n
+[+] 挂钩安装完成。\n	[+] hooks installed.\n
+[!] 等待挂钩安装超时。\n	[!] Timed out waiting for hook installation.\n
+[!] 注入失败。\n	[!] Injection failed.\n
+\n[*] 聚合控制台已启动：http://127.0.0.1:%d/\n	\n[*] aggregation hub started: http://127.0.0.1:%d/\n
+    按 Ctrl+C 退出（退出不影响已注入的进程）。\n\n	    Ctrl+C to quit (quitting does not affect instrumented processes).\n\n
+[!] 无法绑定控制台端口 %d（可能已在运行）。\n	[!] Could not bind hub port %d (one may already be running).\n
+\n[*] 按回车键退出（退出不会卸载已注入的 DLL）。\n	\n[*] Press Enter to quit (quitting does not unload the injected DLL).\n
+\n[i] 提示：加 --hub 可同时启动聚合控制台，集中查看所有被监控进程。\n	\n[i] Tip: add --hub to start the aggregation hub and see every instrumented process at once.\n
+文件	File
+注册表	Registry
+网络	Network
+模块	Module
+内存	Memory
+系统	System
+信息	Info
+注意	Notice
+系统代理：%s%s%s%s%s%s	System proxy: %s%s%s%s%s%s
+(未配置)	(none configured)
+  绕过: 	  bypass: 
+  自动配置脚本: 	  auto-config script: 
+  [自动检测已开启]	  [auto-detect on]
+环境变量 HTTP_PROXY = %s	environment HTTP_PROXY = %s
+环境变量 HTTPS_PROXY = %s	environment HTTPS_PROXY = %s
+事件同时写入文件：%s	events are also written to: %s
+监控已附加：%s (PID %lu)，用户 %s，事件缓存 %u 条	monitor attached: %s (PID %lu), user %s, ring holds %u events
+进程内监控窗口已创建（关闭窗口不影响后台采集）	in-process monitor window created (closing it does not stop collection)
+ProcWatch 行为监控  -  %s  [PID %lu]	ProcWatch behaviour monitor  -  %s  [PID %lu]
+(管道/命名管道)	(pipe/named pipe)
+(字符设备/控制台)	(character device/console)
+查询属性	query attributes
+(子键)	(subkey)
+(空键)	(null key)
+(注册表句柄)	(registry handle)
+写	write
+读	read
+查询	query
+(空文件名)	(null filename)
+%s | 模式 %s | 共享 0x%X%s	%s | %s | share 0x%X%s
+ | 关闭即删除	 | delete on close
+%s | 模式 %s	%s | %s
+(空)	(empty)
+读取 %u 字节%s%s	read %u bytes%s%s
+读取失败（请求 %u 字节，错误 %lu）	read failed (asked for %u bytes, error %lu)
+(未知句柄)	(unknown handle)
+写入 %u 字节%s%s	wrote %u bytes%s%s
+写入失败（请求 %u 字节，错误 %lu）	write failed (asked for %u bytes, error %lu)
+删除成功	deleted
+删除失败	delete failed
+重命名/移动到 %s%s	renamed/moved to %s%s
+ | 覆盖已存在文件	 | overwrite existing
+复制到 %s	copied to %s
+目录已创建	directory created
+创建失败	create failed
+目录已删除	directory removed
+枚举目录内容%s	enumerate directory%s
+（无匹配）	 (no match)
+枚举目录（%s）	enumerate directory (%s)
+仅目录	directories only
+全部条目	all entries
+设置属性 0x%X%s%s	set attributes 0x%X%s%s
+ | 隐藏	 | hidden
+ | 系统	 | system
+类型 %s，%u 字节	type %s, %u bytes
+  值: 	  value: 
+  值: 0x%08X	  value: 0x%08X
+  值: %s	  value: %s
+以%s权限打开	opened with %s access
+创建/打开注册表键（%s）	create/open registry key (%s)
+新建	created new
+已存在	already existed
+(默认值)	(default value)
+查询失败（错误 %ld）	query failed (error %ld)
+已删除	deleted
+已删除（含子键）	deleted (with subkeys)
+以%s权限打开（ANSI 接口）	opened with %s access (ANSI entry point)
+创建/打开注册表键（%s，ANSI 接口）	create/open registry key (%s, ANSI entry point)
+其它	other
+协议族 %s，类型 %s，协议 %d	family %s, type %s, protocol %d
+(新建套接字)	(new socket)
+%s连接%s	%sconnect %s
+尝试	trying to
+发送 %d 字节	sent %d bytes
+(套接字发送)	(socket send)
+接收 %d 字节	received %d bytes
+(套接字接收)	(socket receive)
+发送 %u 字节（%u 个缓冲）	sent %u bytes in %u buffers
+接收 %u 字节	received %u bytes
+(关闭套接字)	(close socket)
+已关闭	closed
+关闭失败	close failed
+解析域名%s%s	resolve host%s%s
+ 端口 	 port 
+解析域名，端口 %s	resolve host, port %s
+解析域名	resolve hostname
+解析域名（旧接口）	resolve hostname (legacy API)
+(默认)	(default)
+  |  显式使用代理: 	  |  explicit proxy: 
+(未提供)	(not supplied)
+  |  使用系统代理配置	  |  using the system proxy configuration
+(WinINet 会话)	(WinINet session)
+%s连接，服务类型 %s%s%s	%sconnect, service %s%s%s
+，用户名 	, user 
+直接打开 URL 并读取响应	open a URL directly and read the response
+  |  明文 HTTP	  |  plaintext HTTP
+  |  不写缓存	  |  no cache write
+发送 HTTP 请求	send the HTTP request
+(HTTP 请求)	(HTTP request)
+读取响应体 %u 字节	read %u bytes of response body
+响应结束	end of response
+读取失败	read failed
+(HTTP 响应)	(HTTP response)
+WinINet 选项 %u	WinINet option %u
+修改代理设置	change the proxy settings
+（清除代理）	 (clearing the proxy)
+刷新代理配置缓存	refresh the cached proxy configuration
+设置 User-Agent	set the User-Agent
+(空命令行)	(empty command line)
+%s新进程 PID %lu%s%s%s%s	%snew process PID %lu%s%s%s%s
+尝试创建	trying to create
+  |  挂起启动	  |  started suspended
+  |  无控制台	  |  no console
+  |  隐藏窗口	  |  hidden window
+  |  新控制台	  |  new console
+以 WinExec 启动，显示方式 %u%s	launched with WinExec, show mode %u%s
+ShellExecute 动词 %s%s	ShellExecute verb %s%s
+%s加载模块%s	%sload module%s
+  |  来自用户可写目录	  |  from a user-writable directory
+动态解析的函数已被监控接管（真实地址 0x%p）	dynamically resolved function handed to the monitor (real address 0x%p)
+动态解析函数地址 0x%p%s	resolve function address 0x%p%s
+（失败）	 (failed)
+申请 %llu 字节，权限 %s	allocate %llu bytes, %s
+已分配	allocated
+分配失败	allocation failed
+%s -> %s，%llu 字节	%s -> %s, %llu bytes
+(本进程内存)	(own process memory)
+在 PID %lu 的地址空间申请 %llu 字节（%s）	PID %lu: allocate %llu bytes (%s)
+(目标进程)	(target process)
+PID %lu：%s -> %s，%llu 字节	PID %lu: %s -> %s, %llu bytes
+向 PID %lu 的 0x%p 写入 %llu 字节	PID %lu: wrote 0x%p (%llu bytes)
+在 PID %lu 中创建线程，入口 0x%p，参数 0x%p	create a thread in PID %lu, entry 0x%p, argument 0x%p
+打开 PID %lu，权限 %s	open PID %lu with %s
+(其它进程)	(another process)
+向线程插入 APC，回调 0x%p（早期注入常用手法）	queue an APC, callback 0x%p (a common early-injection technique)
+(目标线程)	(target thread)
+  |  命名代理: 	  |  named proxy: 
+  |  不使用代理	  |  no proxy
+  |  自动发现代理	  |  auto-detect proxy
+(WinHTTP 会话)	(WinHTTP session)
+已连接	connected
+连接失败	connect failed
+收到响应，HTTP 状态码 %u	response received, HTTP status %u
+收到响应	response received
+响应失败	response failed
+设置 WinHTTP 代理配置	set the WinHTTP proxy configuration
+  代理: 	  proxy: 
+(WinHTTP 代理)	(WinHTTP proxy)
+查询该 URL 应使用的代理	ask which proxy this URL should use
+读取系统(IE)代理配置	read the system (IE) proxy configuration
+(系统代理)	(system proxy)
+预览[%u]: 	preview[%u]: 
+预览[%u]: %s	preview[%u]: %s
+收到停用请求，已还原全部导入/导出表补丁	deactivate requested; every import table patch has been restored
+无法绑定任何端口，WebUI 未启动	could not bind any port; the WebUI did not start
+WebUI 已启动：http://%s/  （仅监听 127.0.0.1）	WebUI started: http://%s/  (listening on 127.0.0.1 only)
+[规则] 	[rule] 
+[注] 	[note] 
+写入自启动/持久化位置	writes to an autostart or persistence location
+访问浏览器凭据/密码库/密钥文件	accesses browser credentials, password stores or key files
+修改 hosts 文件（可能劫持域名）	modifies the hosts file (possible domain hijack)
+在可写目录落地可执行文件	drops an executable into a writable directory
+在 System32 下创建/写入文件	creates or writes a file under System32
+删除系统目录下的文件	deletes a file in a system directory
+疑似卷影副本操作（勒索软件常见手法）	possible shadow-copy operation (common in ransomware)
+写入注册表自启动/服务项	writes a registry autostart or service entry
+改动 Windows Defender 配置/排除项	changes Windows Defender settings or exclusions
+注册表代理设置被修改	registry proxy settings were modified
+创建原始套接字（SOCK_RAW）	creates a raw socket (SOCK_RAW)
+域名解析	name resolution
+使用明文 HTTP 传输	uses plaintext HTTP
+代理相关调用	proxy-related call
+脚本类 User-Agent，疑似自动化下载	script-like User-Agent, suggests an automated download
+下载二进制内容	downloads binary content
+命令行包含编码/隐藏执行参数	command line contains encoded or hidden-execution flags
+启动系统自带工具，可能是无文件落地执行	launches a built-in system tool; possible fileless execution
+从可写目录启动可执行文件	launches an executable from a writable directory
+加载临时/用户目录下的 DLL	loads a DLL from a temporary or user directory
+从用户目录加载模块	loads a module from a user directory
+把已有内存改为可执行	makes existing memory executable
+申请可写可执行内存（shellcode 注入常见手法）	allocates writable+executable memory (common in shellcode injection)
+写入其它进程的内存	writes into another process's memory
+向其它进程注入代码	injects code into another process
+文件操作：创建 / 写入 / 读取 / 复制 / 改名 / 枚举 / 删除	files: create / write / read / copy / rename / enumerate / delete
+ProcWatch 测试数据 hello world 时间戳=%lu\r\n	ProcWatch test data hello world tick=%lu\r\n
+写入 %s（%lu 字节）	wrote %s (%lu bytes)
+读取回 %lu 字节	read back %lu bytes
+复制 -> %s	copied -> %s
+改名 -> %s	renamed -> %s
+枚举目录，共 %d 个条目	enumerated the directory, %d entries
+尝试打开 %d 个凭据类路径（预期失败，用于验证规则匹配）	tried to open %d credential-like paths (expected to fail; this is what the rule matches on)
+清理完成	cleanup done
+注册表：创建键 / 写入值 / 读回 / 删除	registry: create key / write value / read back / delete
+创建 HKCU\\Software\\ProcWatchTest（%s）	created HKCU\\Software\\ProcWatchTest (%s)
+写入 REG_DWORD Marker = 0x%08lX	wrote REG_DWORD Marker = 0x%08lX
+写入 REG_SZ Note	wrote REG_SZ Note
+读回 Marker = 0x%08lX（%s）	read back Marker = 0x%08lX (%s)
+成功	ok
+失败	failed
+删除测试键	deleted the test key
+创建注册表键失败（%ld）	creating the registry key failed (%ld)
+系统代理设置为：%s	system proxy is set to: %s
+当前未配置系统代理	no system proxy is configured
+现有 %lu 个自启动项（仅读取，未修改）	%lu autostart entries present (read only, nothing modified)
+写入模拟自启动路径 %s（仅测试键，未触碰真实 Run 键）	wrote a simulated autostart path %s (test key only; the real Run key is untouched)
+网络：DNS 解析 / TCP 连接 / 发送与接收	network: DNS lookup / TCP connect / send and receive
+Winsock 初始化失败	Winsock initialisation failed
+创建 UDP 套接字（演示 socket 钩子）	created a UDP socket (demonstrates the socket hook)
+DNS 解析 example.com -> %s	resolved example.com -> %s
+TCP 连接成功，发送裸 HTTP 请求	TCP connected; sending a raw HTTP request
+收到 %d 字节响应	received %d bytes of response
+未收到响应（可能无外网或已被防火墙丢弃）	no response (offline, or dropped by a firewall)
+TCP 连接失败（离线或代理环境下属正常，钩子仍然记录）	TCP connect failed (normal when offline or behind a proxy; the hook still records it)
+DNS 解析失败（离线环境属正常）	DNS lookup failed (normal when offline)
+HTTP（WinHTTP）：会话 / 连接 / 请求 / 响应头	HTTP (WinHTTP): session / connect / request / response headers
+WinHttpOpen 失败（%lu）	WinHttpOpen failed (%lu)
+WinHttpOpen 成功	WinHttpOpen succeeded
+WinHttpConnect 成功	WinHttpConnect succeeded
+请求已发送	request sent
+HTTP 状态码 %lu	HTTP status %lu
+发送失败（离线属正常）	send failed (normal when offline)
+WinHttpConnect 失败（离线属正常）	WinHttpConnect failed (normal when offline)
+HTTP（WinINet）：InternetOpen / InternetOpenUrl / InternetReadFile	HTTP (WinINet): InternetOpen / InternetOpenUrl / InternetReadFile
+InternetOpen 失败（%lu）	InternetOpen failed (%lu)
+InternetOpen 成功（使用系统代理配置）	InternetOpen succeeded (using the system proxy configuration)
+InternetOpenUrl 成功	InternetOpenUrl succeeded
+读取到 %lu 字节响应体	read %lu bytes of response body
+未读到内容（离线属正常）	no content read (normal when offline)
+InternetOpenUrl 失败（离线属正常）	InternetOpenUrl failed (normal when offline)
+进程：系统工具调用 / 临时目录落地并执行	processes: built-in tool launch / drop into a temp directory and run
+cmd.exe /c echo ProcWatch 测试输出 & timeout /t 1 >nul	cmd.exe /c echo ProcWatch test output & timeout /t 1 >nul
+启动 cmd.exe（PID %lu）	launched cmd.exe (PID %lu)
+启动 cmd.exe 失败	launching cmd.exe failed
+已把自身复制到 %s	copied itself to %s
+启动临时目录中的副本（PID %lu）	launched the copy from the temp directory (PID %lu)
+已删除副本	deleted the copy
+复制自身失败（%lu）	copying itself failed (%lu)
+模块：加载 DLL / 动态解析函数地址	modules: load a DLL / resolve a function address dynamically
+LoadLibraryA(\"version.dll\") 成功	LoadLibraryA(\"version.dll\") succeeded
+LoadLibraryA(\"version.dll\") 失败	LoadLibraryA(\"version.dll\") failed
+LoadLibraryA(\"winhttp.dll\") 成功	LoadLibraryA(\"winhttp.dll\") succeeded
+通过动态地址申请 4096 字节并写入	allocated 4096 bytes through the dynamic address and wrote to it
+内存：可写可执行内存 / 跨进程写内存与改权限	memory: writable+executable allocation / cross-process write and reprotect
+申请 PAGE_EXECUTE_READWRITE 内存 %p（未执行任何内容）	allocated PAGE_EXECUTE_READWRITE memory at %p (nothing is executed)
+改权限为 PAGE_READONLY（原权限 0x%lX）	reprotected to PAGE_READONLY (was 0x%lX)
+向自身进程写入 %llu 字节（模拟注入的第一阶段）	wrote %llu bytes into its own process (stage one of an injection)
+把该内存改为可执行	made that memory executable
+ProcWatch 测试靶机	ProcWatch test target
+[child] 我是被释放到临时目录的副本，PID %lu，马上退出。\n	[child] I am the copy dropped into the temp directory, PID %lu, exiting now.\n
+  ProcWatch 测试靶机  (PID %lu)\n	  ProcWatch test target  (PID %lu)\n
+  每一步都会产生可被监控端捕获的行为，顺序执行。\n	  Each step produces behaviour the monitor captures, run in order.\n
+  所有产物（文件/注册表键/子进程）都会在结束时清理。\n	  Everything it creates (files, registry keys, child processes) is cleaned up at the end.\n
+  全部行为执行完毕。\n	  All behaviours have been exercised.\n
+  --once 指定，退出。\n	  --once was given, exiting.\n
+  保持运行 %d 秒，方便在监控窗口/WebUI 里查看结果。\n	  Staying alive for %d seconds so the results can be read in the monitor window or WebUI.\n
+  按 Ctrl+C 或关闭本窗口即可退出。\n	  Ctrl+C or closing this window exits.\n
+  [心跳] 已运行 %d 秒，仍被监控中…\n	  [heartbeat] %d seconds in, still being monitored...\n
+时间	Time
+类别	Category
+级别	Level
+目标 / 路径	Target / path
+详情	Detail
+暂停	Pause
+继续	Resume
+已导出 %u 条记录到：\n%s	exported %u records to:\n%s
+ProcWatch 导出	ProcWatch export
+没有可导出的记录。	There is nothing to export.
+WebUI 未启用（http=0）。	The WebUI is disabled (http=0).
+事件详情	Event detail
+清空	Clear
+导出日志	Export log
+复制全部	Copy all
+打开 WebUI	Open WebUI
+只看可疑	Suspicious only
+全部分类	All categories
+    --lang=auto|zh|en 界面语言                         默认 auto\n	    --lang=auto|zh|en interface language               default auto\n
+[!] 打开进程被拒绝。若目标是管理员权限或更高完整性级别，本程序也必须以管理员身份运行。\n	[!] Opening the process was denied. If the target runs as administrator\nor at a higher integrity level, this program must too.\n
+无法创建窗口（该进程可能没有桌面访问权限），请改用 WebUI	could not create a window (this process may have no desktop access), use the WebUI instead
+  累计 %llu 条  |  缓存 %u 条  |  显示 %d 条  |  可疑 %u 条  |  WebUI: http://%s  |  丢失 %lld	  total %llu  |  cached %u  |  shown %d  |  suspect %u  |  WebUI: http://%s  |  dropped %lld
+挂钩 %d 个 API；改写 %d 个模块的导入表，共 %d 处指针（跳过 %d 个系统模块自身导入表）	hooked %d APIs; repointed %d import tables, %d pointers in total (skipped the import tables of %d system modules)
+  累计 %llu 条  |  缓存 %u 条  |  显示 %d 条  |  可疑 %u 条  |  WebUI 未启用  |  丢失 %lld	  total %llu  |  cached %u  |  shown %d  |  suspect %u  |  WebUI off  |  dropped %lld
+时间: %hs\n线程: %u\n类别: %hs\n级别: %hs\nAPI: %s\n\n目标:\n%s\n\n详情:\n%s\n\n返回值: %d   字节数: %u	Time: %hs\nThread: %u\nCategory: %hs\nLevel: %hs\nAPI: %s\n\nTarget:\n%s\n\nDetail:\n%s\n\nresult: %d   bytes: %u
+  ProcWatch v%s  -  进程行为监控\n	  ProcWatch v%s  -  process behaviour monitor\n
+ProcWatch 行为监控	ProcWatch behaviour monitor
+连接中…	connecting...
+用户	User
+运行	Uptime
+丢弃	Dropped
+暂停采集	Pause
+自动滚动	Auto-scroll
+导出 JSONL	Export JSONL
+导出 CSV	Export CSV
+复制当前视图	Copy current view
+等待事件…	waiting for events...
+关闭	Close
+ProcWatch 控制台	ProcWatch console
+控制台	Console
+已监控进程	Monitored processes
+事件合计	Total events
+可疑合计	Total suspect
+立即刷新	Refresh now
+这里列出所有已注入 ProcWatch 的进程。点击"打开 WebUI"查看该进程的实时行为；"停用"会还原该进程的所有挂钩。	Every process with ProcWatch injected is listed here. Click "Open WebUI" to watch one live; "Deactivate" restores all of its hooks.
+运行时长	Uptime
+操作	Actions
+正在扫描…	scanning...
+关键字过滤：路径 / 域名 / API …	filter: path / domain / API ...
+实时推送中	live
+推送中断，重试中…	stream dropped, retrying...
+轮询模式	polling
+连接已断开	disconnected
+继续采集	Resume
+无法读取历史	could not read history
+ProcWatch - 元数据读取失败	ProcWatch - could not read metadata
+读取失败: 	read failed: 
+已复制 	copied 
+ 行	 rows
+显示	Shown
+没有符合过滤条件的事件	no events match the filter
+[规则]	[rule]
+线程	Thread
+字节数	Bytes
+返回值	Result
+时	h
+分	m
+秒	s
+ 时 	 h 
+ 分 	 m 
+ 秒	 s
+停用	Deactivate
+清除记录	Forget
+停用 PID 	Deactivate PID 
+没有发现已注入的进程。用 injector.exe 启动或注入一个目标程序。	No process with ProcWatch injected was found. Start one with injector.exe, or inject into a running process.
+ 的监控？\n将还原该进程内所有被改写的导入/导出表，监控停止。	?\nEvery rewritten import table in that process will be restored and monitoring will stop.

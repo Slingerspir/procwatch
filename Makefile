@@ -7,6 +7,7 @@
 # Requires the MinGW-w64 gcc on PATH (this machine: /d/mingw64/bin).
 
 CC      := gcc
+PYTHON  ?= python
 SRCDIR  := src
 DIST    := dist
 BUILD   := build
@@ -27,12 +28,18 @@ WEBUI_HDR := $(BUILD)/gen/pw_webui_html.h
 HUB_HDR   := $(BUILD)/gen/pw_hub_html.h
 EMBED     := $(BUILD)/embed.exe
 
+# --------------------------------------------------------- generated language
+# tools/lang_en.tsv is the source of truth; the generator pairs each source
+# literal with its translation by value and reports anything missing.
+LANG_HDR  := $(BUILD)/gen/pw_lang_table.h
+
 # ---------------------------------------------------------------------- DLL
 
 DLL_SRCS := \
 	$(SRCDIR)/pw_util.c \
 	$(SRCDIR)/pw_events.c \
 	$(SRCDIR)/pw_config.c \
+	$(SRCDIR)/pw_lang.c \
 	$(SRCDIR)/pw_state.c \
 	$(SRCDIR)/pw_rules.c \
 	$(SRCDIR)/pw_json.c \
@@ -50,13 +57,14 @@ DLL_LIBS := -lkernel32 -luser32 -ladvapi32 -lws2_32 -lwininet -lwinhttp \
 
 # ------------------------------------------------------------------ injector
 
-INJ_SRCS := $(SRCDIR)/injector.c $(SRCDIR)/pw_config.c $(SRCDIR)/pw_util.c
+INJ_SRCS := $(SRCDIR)/injector.c $(SRCDIR)/pw_config.c $(SRCDIR)/pw_lang.c \
+            $(SRCDIR)/pw_util.c
 INJ_OBJS := $(patsubst $(SRCDIR)/%.c,$(BUILD)/inj_%.o,$(INJ_SRCS))
 INJ_LIBS := -lkernel32 -luser32 -ladvapi32 -lws2_32
 
 # ---------------------------------------------------------------- test target
 
-TEST_SRCS := $(SRCDIR)/testtarget.c
+TEST_SRCS := $(SRCDIR)/testtarget.c $(SRCDIR)/pw_lang.c
 TEST_OBJS := $(patsubst $(SRCDIR)/%.c,$(BUILD)/test_%.o,$(TEST_SRCS))
 TEST_LIBS := -lkernel32 -luser32 -lws2_32 -lwinhttp -lwininet
 
@@ -84,17 +92,34 @@ $(BUILD) $(DIST) $(BUILD)/gen:
 $(EMBED): tools/embed.c | $(BUILD)
 	$(CC) -O2 -o $@ $<
 
-$(WEBUI_HDR): web/webui.html $(EMBED) | $(BUILD)/gen
-	$(EMBED) $< $@ pw_webui_html
+$(WEBUI_HDR): web/webui.html tools/lang_en.tsv tools/build_web.py $(EMBED) | $(BUILD)/gen
+	$(PYTHON) tools/build_web.py web/webui.html $(BUILD)/gen/webui.html
+	$(EMBED) $(BUILD)/gen/webui.html $@ pw_webui_html
 
-$(HUB_HDR): web/hub.html $(EMBED) | $(BUILD)/gen
-	$(EMBED) $< $@ pw_hub_html
+$(HUB_HDR): web/hub.html tools/lang_en.tsv tools/build_web.py $(EMBED) | $(BUILD)/gen
+	$(PYTHON) tools/build_web.py web/hub.html $(BUILD)/gen/hub.html
+	$(EMBED) $(BUILD)/gen/hub.html $@ pw_hub_html
+
+# --- language table ---------------------------------------------------------
+# Only pw_lang.o includes the generated table, so only it depends on this.
+$(LANG_HDR): tools/lang_en.tsv tools/gen_lang.py | $(BUILD)/gen
+	$(PYTHON) tools/gen_lang.py
+
+.PHONY: lang check
+lang: $(LANG_HDR)
+
+# Fails if a translation drops or reorders a printf conversion.
+check: $(LANG_HDR)
+	$(PYTHON) tools/check_lang.py
 
 # --- DLL objects (the two HTTP hook files also need the generated header) ---
 $(BUILD)/%.o: $(SRCDIR)/%.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(BUILD)/pw_http.o: $(WEBUI_HDR)
+
+# The language table is compiled into pw_lang.o and nowhere else.
+$(BUILD)/pw_lang.o: $(LANG_HDR)
 
 $(DIST)/ProcWatch.dll: $(DLL_OBJS) | $(DIST)
 	$(CC) -shared -o $@ $(DLL_OBJS) $(DLL_LIBS) $(LDFLAGS)
@@ -105,6 +130,7 @@ $(BUILD)/inj_%.o: $(SRCDIR)/%.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 $(BUILD)/inj_injector.o: $(HUB_HDR)
+$(BUILD)/inj_pw_lang.o: $(LANG_HDR)
 
 $(DIST)/injector.exe: $(INJ_OBJS) | $(DIST)
 	$(CC) -o $@ $(INJ_OBJS) $(INJ_LIBS) $(LDFLAGS)
@@ -113,6 +139,8 @@ $(DIST)/injector.exe: $(INJ_OBJS) | $(DIST)
 # --- test target ------------------------------------------------------------
 $(BUILD)/test_%.o: $(SRCDIR)/%.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD)/test_pw_lang.o: $(LANG_HDR)
 
 $(DIST)/testtarget.exe: $(TEST_OBJS) | $(DIST)
 	$(CC) -o $@ $(TEST_OBJS) $(TEST_LIBS) $(LDFLAGS)

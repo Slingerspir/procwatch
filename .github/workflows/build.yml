@@ -46,6 +46,9 @@ jobs:
       - name: Build
         run: make
 
+      - name: Check the translations
+        run: make check
+
       - name: Build the elevation test fixture
         run: make fixture
 
@@ -54,10 +57,14 @@ jobs:
           # A dynamically linked MinGW runtime (libmcfgthread / libwinpthread)
           # would make these binaries unrunnable anywhere but a machine with the
           # same toolchain installed. Fail loudly instead of shipping that.
+          #
+          # msvcrt and ucrtbase are Windows components and are expected: which
+          # one appears depends on the toolchain's default C runtime (MSYS2's
+          # mingw-w64 links msvcrt, other builds link the UCRT api sets).
           for f in dist/ProcWatch.dll dist/injector.exe dist/testtarget.exe; do
             echo "== $f"
             objdump -p "$f" | grep 'DLL Name' \
-              | grep -viE 'kernel32|user32|advapi32|gdi32|shell32|ws2_32|wininet|winhttp|ole32|ntdll|api-ms-win' \
+              | grep -viE 'kernel32|user32|advapi32|gdi32|shell32|ws2_32|wininet|winhttp|ole32|ntdll|msvcrt|ucrtbase|api-ms-win' \
               && { echo "ERROR: $f depends on a non-system DLL"; exit 1; }
             echo "   only Windows components"
           done

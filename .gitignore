@@ -26,3 +26,7 @@ build/gen/
 Thumbs.db
 Desktop.ini
 *.log
+
+# python bytecode from the build tools
+__pycache__/
+*.pyc

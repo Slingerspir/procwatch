@@ -19,6 +19,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include "pw_lang.h"
 
 typedef struct {
     ULONG_PTR *slot;
@@ -368,8 +369,8 @@ int pw_hooks_install(void)
     {
         char detail[320];
         _snprintf(detail, sizeof(detail),
-                  "挂钩 %d 个 API；改写 %d 个模块的导入表，共 %d 处指针"
-                  "（跳过 %d 个系统模块自身导入表）",
+                  L("挂钩 %d 个 API；改写 %d 个模块的导入表，共 %d 处指针"
+                  "（跳过 %d 个系统模块自身导入表）"),
                   resolved, nmods - skipped, g_nsites, skipped);
         detail[sizeof(detail) - 1] = 0;
         pw_report_force(PW_CAT_SYS, PW_LVL_INFO, "InstallHooks",

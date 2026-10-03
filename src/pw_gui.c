@@ -17,6 +17,23 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include "pw_lang.h"
+
+/* Translate and widen in one step: this file builds most of its text as wide
+ * strings. The result points into a small ring of buffers, so it stays valid
+ * for a few more calls - enough for the window APIs used here, which copy the
+ * text during the call rather than keeping the pointer. */
+static const wchar_t *W(const char *zh)
+{
+    static wchar_t      bufs[16][512];
+    static unsigned int next = 0;
+    wchar_t *buf;
+
+    next = (next + 1) % 16;
+    buf = bufs[next];
+    pw_utf8_to_wide(pw_tr(zh), buf, 512);
+    return buf;
+}
 
 #define ID_LIST          1001
 #define ID_BTN_PAUSE     1002
@@ -139,7 +156,21 @@ static void rebuild_view(GuiState *g)
 
 /* --------------------------------------------------------------- rendering */
 
-static const wchar_t *COL_TITLE[6] = { L"时间", L"类别", L"级别", L"API", L"目标 / 路径", L"详情" };
+/* Column headers. W() hands out rotating buffers, so these cannot live in a
+ * static array; the ListView copies the text during LVM_INSERTCOLUMNW, which is
+ * all this needs. */
+static const wchar_t *column_title(int i)
+{
+    switch (i) {
+    case 0:  return W("时间");
+    case 1:  return W("类别");
+    case 2:  return W("级别");
+    case 3:  return L"API";
+    case 4:  return W("目标 / 路径");
+    case 5:  return W("详情");
+    default: return L"";
+    }
+}
 static int COL_WIDTH[6] = { 96, 62, 62, 132, 420, 460 };
 
 static wchar_t g_cell[6][768];
@@ -175,14 +206,14 @@ static void refresh_status(GuiState *g)
     pw_log_stats(&g_log, &total, counts, 9, lvls, 4);
     if (g_cfg.http && g_http_url[0]) {
         _snprintf(buf, sizeof(buf),
-                  "  累计 %llu 条  |  缓存 %u 条  |  显示 %d 条  |  可疑 %u 条  |  "
-                  "WebUI: http://%s  |  丢失 %lld",
+                  L("  累计 %llu 条  |  缓存 %u 条  |  显示 %d 条  |  可疑 %u 条  |  "
+                  "WebUI: http://%s  |  丢失 %lld"),
                   total, (unsigned)pw_log_count(&g_log), shown,
                   lvls[PW_LVL_SUSPECT], g_http_url, g_pw_dropped);
     } else {
         _snprintf(buf, sizeof(buf),
-                  "  累计 %llu 条  |  缓存 %u 条  |  显示 %d 条  |  可疑 %u 条  |  "
-                  "WebUI 未启用  |  丢失 %lld",
+                  L("  累计 %llu 条  |  缓存 %u 条  |  显示 %d 条  |  可疑 %u 条  |  "
+                  "WebUI 未启用  |  丢失 %lld"),
                   total, (unsigned)pw_log_count(&g_log), shown,
                   lvls[PW_LVL_SUSPECT], g_pw_dropped);
     }
@@ -358,10 +389,10 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
         case ID_BTN_PAUSE:
             if (g_paused) {
                 g_paused = 0;
-                SetWindowTextW(g->btnPause, L"暂停");
+                SetWindowTextW(g->btnPause, W("暂停"));
             } else {
                 g_paused = 1;
-                SetWindowTextW(g->btnPause, L"继续");
+                SetWindowTextW(g->btnPause, W("继续"));
             }
             return 0;
 
@@ -378,12 +409,12 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
                 wchar_t wpath[MAX_PATH * 2], info[MAX_PATH * 3];
                 if (export_rows(g, path, sizeof(path), 0)) {
                     pw_utf8_to_wide(path, wpath, MAX_PATH * 2);
-                    _snwprintf(info, MAX_PATH * 3, L"已导出 %u 条记录到：\n%s",
+                    _snwprintf(info, MAX_PATH * 3, W("已导出 %u 条记录到：\n%s"),
                                g->view.count, wpath);
                     info[MAX_PATH * 3 - 1] = 0;
-                    MessageBoxW(hwnd, info, L"ProcWatch 导出", MB_OK | MB_ICONINFORMATION);
+                    MessageBoxW(hwnd, info, W("ProcWatch 导出"), MB_OK | MB_ICONINFORMATION);
                 } else {
-                    MessageBoxW(hwnd, L"没有可导出的记录。", L"ProcWatch",
+                    MessageBoxW(hwnd, W("没有可导出的记录。"), L"ProcWatch",
                                 MB_OK | MB_ICONWARNING);
                 }
             }
@@ -402,7 +433,7 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
                 pw_utf8_to_wide(u, url, 128);
                 ShellExecuteW(NULL, L"open", url, NULL, NULL, SW_SHOWNORMAL);
             } else {
-                MessageBoxW(hwnd, L"WebUI 未启用（http=0）。", L"ProcWatch",
+                MessageBoxW(hwnd, W("WebUI 未启用（http=0）。"), L"ProcWatch",
                             MB_OK | MB_ICONINFORMATION);
             }
             return 0;
@@ -485,14 +516,14 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp)
                         pw_utf8_to_wide(e->target, wtgt, 1200);
                         pw_utf8_to_wide(e->detail, wdet, 1000);
                         _snwprintf(body, 2400,
-                                   L"时间: %hs\n线程: %u\n类别: %hs\n级别: %hs\n"
-                                   L"API: %s\n\n目标:\n%s\n\n详情:\n%s\n\n"
-                                   L"返回值: %d   字节数: %u",
+                                   W("时间: %hs\n线程: %u\n类别: %hs\n级别: %hs\n"
+                                   "API: %s\n\n目标:\n%s\n\n详情:\n%s\n\n"
+                                   "返回值: %d   字节数: %u"),
                                    ts, e->tid, pw_cat_name(e->cat),
                                    pw_lvl_name(e->lvl), wapi, wtgt, wdet,
                                    e->result, e->size);
                         body[2399] = 0;
-                        MessageBoxW(hwnd, body, L"事件详情", MB_OK | MB_ICONINFORMATION);
+                        MessageBoxW(hwnd, body, W("事件详情"), MB_OK | MB_ICONINFORMATION);
                     }
                     return 0;
                 }
@@ -530,20 +561,20 @@ static void create_children(GuiState *g, HINSTANCE inst)
     LVCOLUMNW col;
     int i;
 
-    g->btnPause = CreateWindowW(L"BUTTON", L"暂停", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+    g->btnPause = CreateWindowW(L"BUTTON", W("暂停"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
                                 0, 0, 0, 0, g->hwnd, (HMENU)ID_BTN_PAUSE, inst, NULL);
-    g->btnClear = CreateWindowW(L"BUTTON", L"清空", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+    g->btnClear = CreateWindowW(L"BUTTON", W("清空"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
                                 0, 0, 0, 0, g->hwnd, (HMENU)ID_BTN_CLEAR, inst, NULL);
-    g->btnExport = CreateWindowW(L"BUTTON", L"导出日志", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+    g->btnExport = CreateWindowW(L"BUTTON", W("导出日志"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
                                 0, 0, 0, 0, g->hwnd, (HMENU)ID_BTN_EXPORT, inst, NULL);
-    g->btnCopy = CreateWindowW(L"BUTTON", L"复制全部", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+    g->btnCopy = CreateWindowW(L"BUTTON", W("复制全部"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
                                 0, 0, 0, 0, g->hwnd, (HMENU)ID_BTN_COPY, inst, NULL);
-    g->btnWeb = CreateWindowW(L"BUTTON", L"打开 WebUI", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
+    g->btnWeb = CreateWindowW(L"BUTTON", W("打开 WebUI"), WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
                                 0, 0, 0, 0, g->hwnd, (HMENU)ID_BTN_WEB, inst, NULL);
     g->cmbCat = CreateWindowW(L"COMBOBOX", NULL,
                               WS_CHILD | WS_VISIBLE | CBS_DROPDOWNLIST | WS_VSCROLL,
                               0, 0, 0, 0, g->hwnd, (HMENU)ID_CMB_CAT, inst, NULL);
-    g->chkSuspect = CreateWindowW(L"BUTTON", L"只看可疑",
+    g->chkSuspect = CreateWindowW(L"BUTTON", W("只看可疑"),
                                   WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX,
                                   0, 0, 0, 0, g->hwnd, (HMENU)ID_CHK_SUSPECT, inst, NULL);
     g->editSearch = CreateWindowExW(WS_EX_CLIENTEDGE, L"EDIT", L"",
@@ -564,19 +595,19 @@ static void create_children(GuiState *g, HINSTANCE inst)
     col.mask = LVCF_TEXT | LVCF_WIDTH | LVCF_SUBITEM;
     for (i = 0; i < 6; i++) {
         col.iSubItem = i;
-        col.pszText = (LPWSTR)COL_TITLE[i];
+        col.pszText = (LPWSTR)column_title(i);
         col.cx = COL_WIDTH[i];
         SendMessageW(g->list, LVM_INSERTCOLUMNW, (WPARAM)i, (LPARAM)&col);
     }
 
-    SendMessageW(g->cmbCat, CB_ADDSTRING, 0, (LPARAM)L"全部分类");
-    SendMessageW(g->cmbCat, CB_ADDSTRING, 0, (LPARAM)L"文件");
-    SendMessageW(g->cmbCat, CB_ADDSTRING, 0, (LPARAM)L"注册表");
-    SendMessageW(g->cmbCat, CB_ADDSTRING, 0, (LPARAM)L"网络");
+    SendMessageW(g->cmbCat, CB_ADDSTRING, 0, (LPARAM)W("全部分类"));
+    SendMessageW(g->cmbCat, CB_ADDSTRING, 0, (LPARAM)W("文件"));
+    SendMessageW(g->cmbCat, CB_ADDSTRING, 0, (LPARAM)W("注册表"));
+    SendMessageW(g->cmbCat, CB_ADDSTRING, 0, (LPARAM)W("网络"));
     SendMessageW(g->cmbCat, CB_ADDSTRING, 0, (LPARAM)L"HTTP");
-    SendMessageW(g->cmbCat, CB_ADDSTRING, 0, (LPARAM)L"进程");
-    SendMessageW(g->cmbCat, CB_ADDSTRING, 0, (LPARAM)L"模块");
-    SendMessageW(g->cmbCat, CB_ADDSTRING, 0, (LPARAM)L"内存");
+    SendMessageW(g->cmbCat, CB_ADDSTRING, 0, (LPARAM)W("进程"));
+    SendMessageW(g->cmbCat, CB_ADDSTRING, 0, (LPARAM)W("模块"));
+    SendMessageW(g->cmbCat, CB_ADDSTRING, 0, (LPARAM)W("内存"));
     SendMessageW(g->cmbCat, CB_SETCURSEL, 0, 0);
 
     if (g->font) {
@@ -623,7 +654,7 @@ static DWORD WINAPI gui_thread(LPVOID param)
     x = 80 + (int)(g_pid % 8) * 34;
     y = 60 + (int)(g_pid % 5) * 30;
 
-    _snprintf(t8, sizeof(t8), "ProcWatch 行为监控  -  %s  [PID %lu]",
+    _snprintf(t8, sizeof(t8), L("ProcWatch 行为监控  -  %s  [PID %lu]"),
               g_exe_name, (unsigned long)g_pid);
     t8[sizeof(t8) - 1] = 0;
     pw_utf8_to_wide(t8, title, 300);

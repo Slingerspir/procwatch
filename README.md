@@ -2,6 +2,8 @@
 
 [![build](https://github.com/Slingerspir/procwatch/actions/workflows/build.yml/badge.svg)](https://github.com/Slingerspir/procwatch/actions/workflows/build.yml)
 
+[English](README.en.md)
+
 把一个 DLL 注入到任意 Windows 进程里，实时展示这个进程**到底做了什么**：读了哪些文件、
 写了哪些注册表键、连了哪些地址、发了什么 HTTP 请求、用了什么代理、启动了哪些子进程、
 加载了哪些模块、申请了什么内存。
@@ -65,6 +67,7 @@ injector.exe --hub [--hub-port N]                 启动聚合控制台
 | `--log=0\|1` | 0 | 事件同时落盘到 `%TEMP%\ProcWatch\logs\` |
 | `--previews=0\|1` | 0 | 记录读写/收发的数据预览（文本或十六进制） |
 | `--risk=0\|1` | 1 | 可疑行为规则引擎 |
+| `--lang=auto\|zh\|en` | auto | 界面语言（跟随系统，可强制指定） |
 | `--verbose=0\|1` | 0 | 记录高频 API（如全部 `GetProcAddress`） |
 | `--ring=N` | 8192 | 事件环形缓冲条数 |
 
@@ -243,6 +246,21 @@ testtarget.exe --hold 60  跑完后保持 60 秒
   `HKCU\Software\ProcWatchTest\CurrentVersion\Run` 下，写完立刻删除。**不碰真实的 Run 键。**
 
 想验证持久化规则的真实效果，自己往 `shell:startup` 里放个快捷方式即可。
+
+---
+
+## 语言
+
+界面（注入器、进程内窗口、事件日志、规则说明、WebUI、测试靶机）都是中英双语的。中文原文就是
+查找键，所以缺翻译会退回中文而不是空白，`tools/check_lang.py` 会在译文漏掉或打乱 `printf`
+格式说明符时让构建失败。
+
+```bat
+dist\injector.exe --exe dist\testtarget.exe --lang=en
+```
+
+默认跟随系统 UI 语言。译文在 `tools/lang_en.tsv`，由 `tools/gen_lang.py` 编译进 DLL 和
+WebUI 的字典。
 
 ---
 

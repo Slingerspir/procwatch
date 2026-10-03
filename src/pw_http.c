@@ -22,6 +22,7 @@
 #include <string.h>
 
 #include "pw_webui_html.h"
+#include "pw_lang.h"
 
 #define MAX_CLIENTS      48
 #define REQ_MAX          16384
@@ -185,13 +186,13 @@ static void reply_meta(PW_OUT *o)
     out_json_str(o, g_exe_path);
     out_puts(o, ",\"user\":");
     out_json_str(o, g_user);
-    out_printf(o, ",\"arch\":\"%s\",\"url\":\"%s\",",
+    out_printf(o, ",\"arch\":\"%s\",\"url\":\"%s\",\"lang\":\"%s\",",
 #ifdef _WIN64
                "x64",
 #else
                "x86",
 #endif
-               g_http_url);
+               g_http_url, pw_lang_is_en() ? "en" : "zh");
     out_printf(o, "\"startedMs\":%llu,\"uptimeMs\":%llu,\"events\":%llu,\"cached\":%u,",
                g_start_ms, now - g_start_ms, total, (unsigned)pw_log_count(&g_log));
     out_printf(o, "\"suspect\":%u,\"warn\":%u,\"dropped\":%lld,"
@@ -522,7 +523,7 @@ static void handle_request(PW_OUT *o, SOCKET raw, const char *method,
         out_flush(o);
         Sleep(200);                       /* let the answer drain first */
         pw_report_force(PW_CAT_SYS, PW_LVL_WARN, "Deactivate", g_exe_name,
-                        "收到停用请求，已还原全部导入/导出表补丁", 0, 0);
+                        L("收到停用请求，已还原全部导入/导出表补丁"), 0, 0);
         pw_hooks_remove();
         g_paused = 1;
         g_active = 0;
@@ -706,7 +707,7 @@ int pw_http_start(void)
 
     if (g_listen == INVALID_SOCKET) {
         pw_report_force(PW_CAT_SYS, PW_LVL_WARN, "HttpStart", g_exe_name,
-                        "无法绑定任何端口，WebUI 未启动", 0, 0);
+                        L("无法绑定任何端口，WebUI 未启动"), 0, 0);
         return 0;
     }
 
@@ -729,7 +730,7 @@ int pw_http_start(void)
     {
         char detail[256];
         _snprintf(detail, sizeof(detail),
-                  "WebUI 已启动：http://%s/  （仅监听 127.0.0.1）", g_http_url);
+                  L("WebUI 已启动：http://%s/  （仅监听 127.0.0.1）"), g_http_url);
         detail[sizeof(detail) - 1] = 0;
         pw_report_force(PW_CAT_SYS, PW_LVL_INFO, "HttpStart", g_exe_name, detail, 0, 0);
     }

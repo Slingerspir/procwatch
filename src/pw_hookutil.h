@@ -11,6 +11,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+#include "pw_lang.h"
 
 /* Are we currently in a position to record anything at all? Checked before any
  * expensive work (path resolution, previews). */
@@ -43,7 +44,7 @@ static inline void pw_preview(const void *data, unsigned int len, char *out, int
     take = len > 128 ? 128 : len;
     if (pw_is_printable(p, (int)take)) {
         unsigned int i;
-        int pos = snprintf(out, (size_t)outsz, "预览[%u]: ", len);
+        int pos = snprintf(out, (size_t)outsz, L("预览[%u]: "), len);
         for (i = 0; i < take && pos < outsz - 1; i++) {
             unsigned char c = p[i];
             out[pos++] = (c == '\r' || c == '\n' || c == '\t') ? ' ' :
@@ -53,7 +54,7 @@ static inline void pw_preview(const void *data, unsigned int len, char *out, int
     } else {
         char hex[420];
         pw_hex_ascii(p, (int)(take > 48 ? 48 : take), hex, sizeof(hex));
-        pw_fmt(out, outsz, "预览[%u]: %s", len, hex);
+        pw_fmt(out, outsz, L("预览[%u]: %s"), len, hex);
     }
 }
 
