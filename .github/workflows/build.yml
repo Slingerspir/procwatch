@@ -33,15 +33,21 @@ jobs:
         uses: msys2/setup-msys2@v2
         with:
           msystem: MINGW64
+          # The build generates the language table and localises the web assets,
+          # so it needs Python. Taking it from MSYS2 rather than the host keeps
+          # one toolchain, and puts `python` on PATH inside this shell - the
+          # runner's own Python is not visible from the MSYS2 environment.
           install: >-
             make
             mingw-w64-x86_64-gcc
             mingw-w64-x86_64-binutils
+            mingw-w64-x86_64-python
 
       - name: Toolchain
         run: |
           gcc --version | head -1
           make --version | head -1
+          python --version
 
       - name: Build
         run: make
