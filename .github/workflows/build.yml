@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   build:
-    name: build (mingw-w64 x64)
+    name: build (mingw-w64 ucrt64 x64)
     runs-on: windows-latest
 
     # The Makefile is written for a POSIX shell and drives the MinGW-w64
@@ -27,21 +27,21 @@ jobs:
         shell: msys2 {0}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up MSYS2 / MinGW-w64
         uses: msys2/setup-msys2@v2
         with:
-          msystem: MINGW64
+          msystem: UCRT64
           # The build generates the language table and localises the web assets,
           # so it needs Python. Taking it from MSYS2 rather than the host keeps
           # one toolchain, and puts `python` on PATH inside this shell - the
           # runner's own Python is not visible from the MSYS2 environment.
           install: >-
             make
-            mingw-w64-x86_64-gcc
-            mingw-w64-x86_64-binutils
-            mingw-w64-x86_64-python
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-binutils
+            mingw-w64-ucrt-x86_64-python
 
       - name: Toolchain
         run: |
@@ -76,7 +76,7 @@ jobs:
           done
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: procwatch-x64
           path: |
@@ -91,9 +91,9 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: procwatch-x64
           path: dist
@@ -108,7 +108,7 @@ jobs:
 
       - name: Upload the captured log on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: smoke-test-logs
           path: |
