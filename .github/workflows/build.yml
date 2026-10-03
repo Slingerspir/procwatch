@@ -1,0 +1,104 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# The token only needs to read the repository: nothing here writes back.
+permissions:
+  contents: read
+
+# A new push to the same branch makes the previous run irrelevant.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build (mingw-w64 x64)
+    runs-on: windows-latest
+
+    # The Makefile is written for a POSIX shell and drives the MinGW-w64
+    # toolchain, so the whole job runs inside the MSYS2 environment.
+    defaults:
+      run:
+        shell: msys2 {0}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up MSYS2 / MinGW-w64
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          install: >-
+            make
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-binutils
+
+      - name: Toolchain
+        run: |
+          gcc --version | head -1
+          make --version | head -1
+
+      - name: Build
+        run: make
+
+      - name: Build the elevation test fixture
+        run: make fixture
+
+      - name: Check the artifacts stand on their own
+        run: |
+          # A dynamically linked MinGW runtime (libmcfgthread / libwinpthread)
+          # would make these binaries unrunnable anywhere but a machine with the
+          # same toolchain installed. Fail loudly instead of shipping that.
+          for f in dist/ProcWatch.dll dist/injector.exe dist/testtarget.exe; do
+            echo "== $f"
+            objdump -p "$f" | grep 'DLL Name' \
+              | grep -viE 'kernel32|user32|advapi32|gdi32|shell32|ws2_32|wininet|winhttp|ole32|ntdll|api-ms-win' \
+              && { echo "ERROR: $f depends on a non-system DLL"; exit 1; }
+            echo "   only Windows components"
+          done
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: procwatch-x64
+          path: |
+            dist/ProcWatch.dll
+            dist/injector.exe
+            dist/testtarget.exe
+          if-no-files-found: error
+
+  verify:
+    name: verify (inject and read the events back)
+    needs: build
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: procwatch-x64
+          path: dist
+
+      # Compiling is not the interesting property of this project - a monitor
+      # that installs its hooks but never gets called still compiles, still
+      # starts, and silently reports nothing. So run it for real and check the
+      # events came back.
+      - name: End-to-end smoke test
+        shell: pwsh
+        run: ./.github/smoke-test.ps1 -Dist dist
+
+      - name: Upload the captured log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test-logs
+          path: |
+            injector.out.log
+            injector.err.log
+          if-no-files-found: ignore

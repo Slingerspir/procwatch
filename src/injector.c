@@ -634,7 +634,10 @@ static void report_target(DWORD pid)
                 printf("  PID      : %lu\n", (unsigned long)pid);
                 printf("  进程     : %s\n", list[i].exe);
                 printf("  WebUI    : http://127.0.0.1:%d/\n", list[i].port);
-                printf("  进程窗口 : 已在目标进程内创建（若该进程无桌面则只有 WebUI）\n");
+                if (g_cfg.gui)
+                    printf("  进程窗口 : 已在目标进程内创建（若该进程无桌面则只有 WebUI）\n");
+                else
+                    printf("  进程窗口 : 已禁用（--gui=0）\n");
                 if (g_hubRunning)
                     printf("  控制台   : http://127.0.0.1:%d/\n", g_hubPort);
                 return;

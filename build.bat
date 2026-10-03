@@ -17,6 +17,10 @@ if errorlevel 1 (
 
 set CFLAGS=-O2 -Wall -Wextra -Wno-unused-parameter -std=gnu11 -D_WIN32_WINNT=0x0A00 -DWINVER=0x0A00 -finput-charset=UTF-8 -fexec-charset=UTF-8 -Isrc -Ibuild\gen
 
+rem -static keeps MinGW's C runtime out of the picture: linked dynamically it
+rem becomes a separate DLL that only exists inside the toolchain directory.
+set LDFLAGS=-static
+
 if not exist build\gen mkdir build\gen
 if not exist dist mkdir dist
 
@@ -28,16 +32,16 @@ build\embed.exe web\webui.html build\gen\pw_webui_html.h pw_webui_html || exit /
 build\embed.exe web\hub.html   build\gen\pw_hub_html.h   pw_hub_html   || exit /b 1
 
 echo [3/4] building ProcWatch.dll...
-%GCC% %CFLAGS% -shared -o dist\ProcWatch.dll ^
+%GCC% %CFLAGS% %LDFLAGS% -shared -o dist\ProcWatch.dll ^
     src\pw_util.c src\pw_events.c src\pw_config.c src\pw_state.c src\pw_rules.c ^
     src\pw_json.c src\pw_hooks.c src\pw_hookapi.c src\pw_hookapi_winhttp.c ^
     src\pw_gui.c src\pw_http.c src\pw_dll.c ^
     -lkernel32 -luser32 -ladvapi32 -lws2_32 -lwininet -lwinhttp -lcomctl32 -lgdi32 -lshell32 || exit /b 1
 
 echo [4/4] building injector.exe and testtarget.exe...
-%GCC% %CFLAGS% -o dist\injector.exe src\injector.c src\pw_config.c src\pw_util.c ^
+%GCC% %CFLAGS% %LDFLAGS% -o dist\injector.exe src\injector.c src\pw_config.c src\pw_util.c ^
     -lkernel32 -luser32 -ladvapi32 -lws2_32 || exit /b 1
-%GCC% %CFLAGS% -o dist\testtarget.exe src\testtarget.c ^
+%GCC% %CFLAGS% %LDFLAGS% -o dist\testtarget.exe src\testtarget.c ^
     -lkernel32 -luser32 -lws2_32 -lwinhttp -lwininet || exit /b 1
 
 echo.

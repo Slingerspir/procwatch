@@ -1,5 +1,7 @@
 # ProcWatch — 进程行为监控
 
+[![build](https://github.com/Slingerspir/procwatch/actions/workflows/build.yml/badge.svg)](https://github.com/Slingerspir/procwatch/actions/workflows/build.yml)
+
 把一个 DLL 注入到任意 Windows 进程里，实时展示这个进程**到底做了什么**：读了哪些文件、
 写了哪些注册表键、连了哪些地址、发了什么 HTTP 请求、用了什么代理、启动了哪些子进程、
 加载了哪些模块、申请了什么内存。

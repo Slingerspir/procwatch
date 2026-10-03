@@ -14,7 +14,12 @@ BUILD   := build
 WINVER  := -D_WIN32_WINNT=0x0A00 -DWINVER=0x0A00
 CHARSET := -finput-charset=UTF-8 -fexec-charset=UTF-8
 CFLAGS  := -O2 -Wall -Wextra -Wno-unused-parameter -std=gnu11 $(WINVER) $(CHARSET) -I$(SRCDIR) -I$(BUILD)/gen
-LDFLAGS :=
+# -static matters for distribution: without it MinGW links its own C runtime
+# (mcfgthread or winpthread) as a separate DLL, which lives in the toolchain's
+# bin directory and is not present on a machine that only downloaded the
+# binaries. The result would be "libmcfgthread-2.dll is missing" for anyone who
+# did not install the same toolchain.
+LDFLAGS := -static
 
 # ---------------------------------------------------------------- generated web
 
@@ -57,7 +62,7 @@ TEST_LIBS := -lkernel32 -luser32 -lws2_32 -lwinhttp -lwininet
 
 # --------------------------------------------------------------------- rules
 
-.PHONY: all dll injector testtarget web clean run fixture
+.PHONY: all dll injector testtarget web clean fixture
 
 all: $(DIST)/ProcWatch.dll $(DIST)/injector.exe $(DIST)/testtarget.exe
 	@echo ""
@@ -122,8 +127,7 @@ $(DIST)/testtarget.exe: $(TEST_OBJS) | $(DIST)
 #   injector.exe --exe build\elevation_fixture.exe --no-elevate
 #
 fixture: | $(BUILD)
-	/d/mingw64/bin/windres tools/elevation_fixture.rc -O coff \
-		-o $(BUILD)/elevation_fixture.res
+	windres tools/elevation_fixture.rc -O coff -o $(BUILD)/elevation_fixture.res
 	$(CC) -O2 -o $(BUILD)/elevation_fixture.exe tools/elevation_fixture.c \
 		$(BUILD)/elevation_fixture.res
 	@echo "  [fixture] $(BUILD)/elevation_fixture.exe"
