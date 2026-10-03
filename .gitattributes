@@ -1,0 +1,13 @@
+* text=auto
+
+# keep sources LF in the repository
+*.c    text eol=lf
+*.h    text eol=lf
+*.html text eol=lf
+*.md   text eol=lf
+Makefile text eol=lf
+
+# cmd.exe is happiest with CRLF
+*.bat  text eol=crlf
+
+*.png  binary

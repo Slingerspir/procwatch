@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ProcWatch 行为监控</title>
+<style>
+  :root{
+    --bg:#0e1116; --panel:#151a21; --panel2:#1b2129; --line:#252c36;
+    --fg:#e6edf3; --dim:#8b97a5; --dim2:#5f6b7a;
+    --file:#5aa9ff; --reg:#c084fc; --net:#34d399; --http:#22d3ee;
+    --proc:#fbbf24; --mod:#94a3b8; --mem:#fb7185; --sys:#7c8798;
+    --warn:#f0a030; --susp:#ff5c5c;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--bg); color:var(--fg); font:13px/1.5 "Microsoft YaHei UI","Segoe UI",system-ui,sans-serif;
+    display:flex; flex-direction:column; height:100vh; overflow:hidden;
+  }
+  code,pre,.mono{font-family:"Cascadia Mono",Consolas,"Courier New",monospace}
+
+  header{
+    display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+    padding:10px 16px; background:var(--panel); border-bottom:1px solid var(--line);
+  }
+  .brand{font-weight:700;font-size:15px;letter-spacing:.3px}
+  .brand span{color:var(--file)}
+  .chip{
+    background:var(--panel2); border:1px solid var(--line); border-radius:999px;
+    padding:2px 10px; color:var(--dim); font-size:12px;
+  }
+  .chip b{color:var(--fg); font-weight:600}
+  #dot{width:8px;height:8px;border-radius:50%;background:var(--dim2);display:inline-block;margin-right:6px}
+  #dot.on{background:var(--net); box-shadow:0 0 8px var(--net)}
+  #dot.off{background:var(--susp)}
+
+  .bar{
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+    padding:8px 16px; background:var(--bg); border-bottom:1px solid var(--line);
+  }
+  button,select,input{
+    background:var(--panel2); color:var(--fg); border:1px solid var(--line);
+    border-radius:6px; padding:5px 10px; font-size:12px; font-family:inherit; cursor:pointer;
+  }
+  button:hover{border-color:#3a4553; background:#222a34}
+  button.active{background:#1d3a5c; border-color:#2f5c8f; color:#cfe6ff}
+  input{cursor:text; min-width:200px}
+  input::placeholder{color:var(--dim2)}
+  .grow{flex:1}
+  .sep{width:1px;height:20px;background:var(--line)}
+
+  #stats{display:flex;gap:6px;flex-wrap:wrap;padding:8px 16px 0}
+  .stat{
+    display:flex;align-items:baseline;gap:6px;background:var(--panel);border:1px solid var(--line);
+    border-radius:6px;padding:4px 10px;font-size:12px;
+  }
+  .stat i{font-style:normal;color:var(--dim)}
+  .stat b{font-weight:600}
+
+  main{flex:1;display:flex;min-height:0;padding:10px 16px 14px}
+  #wrap{flex:1;min-width:0;overflow:auto;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+  table{border-collapse:separate;border-spacing:0;width:100%;font-size:12px}
+  thead th{
+    position:sticky;top:0;z-index:2;background:var(--panel2);color:var(--dim);
+    text-align:left;font-weight:600;padding:7px 10px;border-bottom:1px solid var(--line);
+    white-space:nowrap;
+  }
+  tbody td{padding:4px 10px;border-bottom:1px solid #1c222a;vertical-align:top}
+  tbody tr:hover{background:#1a2129}
+  tbody tr.sel{background:#1d2a3a}
+  td.t{color:var(--dim);white-space:nowrap;font-family:Consolas,monospace;font-size:11px}
+  td.api{font-family:Consolas,monospace;color:#c9d6e4;white-space:nowrap}
+  td.tgt{font-family:Consolas,monospace;word-break:break-all;max-width:420px}
+  td.det{color:var(--dim);word-break:break-all;max-width:520px}
+  .lvl{font-size:11px;padding:1px 7px;border-radius:4px;border:1px solid transparent;white-space:nowrap}
+  .l-info{color:var(--dim);border-color:#2b333e}
+  .l-warn{color:var(--warn);border-color:#4a3418;background:#2a1f0d}
+  .l-susp{color:var(--susp);border-color:#5a2020;background:#2c1414;font-weight:600}
+  .c-file{color:var(--file)} .c-reg{color:var(--reg)} .c-net{color:var(--net)}
+  .c-http{color:var(--http)} .c-proc{color:var(--proc)} .c-mod{color:var(--mod)}
+  .c-mem{color:var(--mem)} .c-sys{color:var(--sys)}
+  .rule{color:var(--susp);font-weight:600}
+
+  #drawer{
+    width:0;overflow:hidden;transition:width .15s ease;border-left:1px solid var(--line);
+    background:var(--panel);display:flex;flex-direction:column;
+  }
+  #drawer.open{width:420px;margin-left:10px;border-radius:8px;border:1px solid var(--line)}
+  #drawer .dh{padding:10px 12px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+  #drawer .db{padding:10px 12px;overflow:auto;flex:1}
+  #drawer pre{white-space:pre-wrap;word-break:break-all;font-size:12px;color:#c9d6e4;margin:0 0 10px}
+  .kv{display:grid;grid-template-columns:88px 1fr;gap:3px 10px;font-size:12px;margin-bottom:12px}
+  .kv i{color:var(--dim);font-style:normal}
+  .empty{color:var(--dim2);padding:24px;text-align:center}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">Proc<span>Watch</span></div>
+  <div class="chip"><span id="dot"></span><span id="status">连接中…</span></div>
+  <div class="chip">进程 <b id="mExe">-</b></div>
+  <div class="chip">PID <b id="mPid">-</b></div>
+  <div class="chip">用户 <b id="mUser">-</b></div>
+  <div class="chip">运行 <b id="mUp">-</b></div>
+  <div class="chip">WebUI <b id="mUrl">-</b></div>
+  <div class="grow"></div>
+  <div class="chip">丢弃 <b id="mDrop">0</b></div>
+</header>
+
+<div id="stats"></div>
+
+<div class="bar">
+  <button id="bPause">暂停采集</button>
+  <button id="bClear">清空</button>
+  <button id="bFollow" class="active">自动滚动</button>
+  <div class="sep"></div>
+  <select id="fCat">
+    <option value="0">全部分类</option>
+    <option value="1">文件</option><option value="2">注册表</option>
+    <option value="3">网络</option><option value="4">HTTP</option>
+    <option value="5">进程</option><option value="6">模块</option>
+    <option value="7">内存</option><option value="8">系统</option>
+  </select>
+  <button id="bSusp">只看可疑</button>
+  <div class="sep"></div>
+  <input id="fQ" placeholder="关键字过滤：路径 / 域名 / API …">
+  <div class="grow"></div>
+  <button id="bJson">导出 JSONL</button>
+  <button id="bCsv">导出 CSV</button>
+  <button id="bCopy">复制当前视图</button>
+</div>
+
+<main>
+  <div id="wrap">
+    <table>
+      <thead><tr>
+        <th style="width:96px">时间</th>
+        <th style="width:70px">类别</th>
+        <th style="width:70px">级别</th>
+        <th style="width:150px">API</th>
+        <th>目标 / 路径</th>
+        <th>详情</th>
+      </tr></thead>
+      <tbody id="rows"><tr><td colspan="6" class="empty">等待事件…</td></tr></tbody>
+    </table>
+  </div>
+  <aside id="drawer">
+    <div class="dh"><b>事件详情</b><button id="dClose">关闭</button></div>
+    <div class="db" id="dBody"></div>
+  </aside>
+</main>
+
+<script>
+"use strict";
+const CAT = {1:["文件","c-file"],2:["注册表","c-reg"],3:["网络","c-net"],4:["HTTP","c-http"],
+             5:["进程","c-proc"],6:["模块","c-mod"],7:["内存","c-mem"],8:["系统","c-sys"]};
+const LVL = {0:["信息","l-info"],1:["注意","l-warn"],2:["可疑","l-susp"]};
+const MAX_KEEP = 4000, MAX_DOM = 1200;
+
+let meta = null;
+let all = [];            // accumulated events, oldest first
+let cursor = 0;          // highest seq we have consumed
+let filterCat = 0, onlySusp = false, q = "", follow = true, paused = false;
+let selectedSeq = 0;
+let source = null, pollTimer = null, fails = 0;
+
+const $ = id => document.getElementById(id);
+const esc = s => (s == null ? "" : String(s)).replace(/[&<>"]/g,
+  c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function matches(e) {
+  if (filterCat && e.cat !== filterCat) return false;
+  if (onlySusp && e.lvl !== 2) return false;
+  if (q) {
+    const s = (e.target + " " + e.detail + " " + e.api + " " + (CAT[e.cat] ? CAT[e.cat][0] : "")).toLowerCase();
+    if (s.indexOf(q) < 0) return false;
+  }
+  return true;
+}
+
+function visible() {
+  const out = [];
+  for (let i = 0; i < all.length; i++) if (matches(all[i])) out.push(all[i]);
+  return out;
+}
+
+function rowHtml(e) {
+  const c = CAT[e.cat] || ["?",""]; const l = LVL[e.lvl] || ["?",""];
+  const detail = esc(e.detail).replace(/\[规则\]/g, '<span class="rule">[规则]</span>');
+  return '<tr data-seq="' + e.seq + '">'
+    + '<td class="t">' + esc((e.time || "").slice(11)) + '</td>'
+    + '<td class="' + c[1] + '">' + c[0] + '</td>'
+    + '<td><span class="lvl ' + l[1] + '">' + l[0] + '</span></td>'
+    + '<td class="api">' + esc(e.api) + '</td>'
+    + '<td class="tgt">' + esc(e.target) + '</td>'
+    + '<td class="det">' + detail + '</td></tr>';
+}
+
+function redraw() {
+  const rows = visible();
+  const tail = rows.length > MAX_DOM ? rows.slice(rows.length - MAX_DOM) : rows;
+  const body = $("rows");
+  body.innerHTML = tail.length
+    ? tail.map(rowHtml).join("")
+    : '<tr><td colspan="6" class="empty">没有符合过滤条件的事件</td></tr>';
+  if (follow) body.parentElement.parentElement.scrollTop = 1e9;
+  const sel = body.querySelector('tr[data-seq="' + selectedSeq + '"]');
+  if (sel) sel.classList.add("sel");
+  refreshStats(rows);
+}
+
+function appendRows(list) {
+  const rows = list.filter(matches);
+  if (!rows.length) return;
+  const body = $("rows");
+  if (body.querySelector(".empty")) body.innerHTML = "";
+  body.insertAdjacentHTML("beforeend", rows.map(rowHtml).join(""));
+  while (body.childElementCount > MAX_DOM) body.removeChild(body.firstElementChild);
+  if (follow) body.parentElement.parentElement.scrollTop = 1e9;
+  refreshStats(null);
+}
+
+function refreshStats(precomputed) {
+  const rows = precomputed || visible();
+  const counts = {1:0,2:0,3:0,4:0,5:0,6:0,7:0,8:0};
+  let susp = 0;
+  for (const e of rows) { counts[e.cat] = (counts[e.cat] || 0) + 1; if (e.lvl === 2) susp++; }
+  let html = '<div class="stat"><i>显示</i><b>' + rows.length + '</b></div>'
+           + '<div class="stat"><i>可疑</i><b style="color:var(--susp)">' + susp + '</b></div>';
+  for (const k in CAT) {
+    if (!counts[k]) continue;
+    html += '<div class="stat ' + CAT[k][1] + '"><i>' + CAT[k][0] + '</i><b>' + counts[k] + '</b></div>';
+  }
+  $("stats").innerHTML = html;
+}
+
+function addAll(list) {
+  for (const e of list) {
+    all.push(e);
+    if (e.seq > cursor) cursor = e.seq;
+  }
+  if (all.length > MAX_KEEP) all = all.slice(all.length - MAX_KEEP);
+}
+
+function showDetail(e) {
+  selectedSeq = e.seq;
+  const c = CAT[e.cat] || ["?",""], l = LVL[e.lvl] || ["?",""];
+  $("dBody").innerHTML =
+    '<div class="kv">'
+    + '<i>时间</i><span>' + esc(e.time) + '</span>'
+    + '<i>线程</i><span>' + e.tid + '</span>'
+    + '<i>类别</i><span class="' + c[1] + '">' + c[0] + '</span>'
+    + '<i>级别</i><span class="' + l[1] + '">' + l[0] + '</span>'
+    + '<i>API</i><span class="mono">' + esc(e.api) + '</span>'
+    + '<i>字节数</i><span>' + (e.size || 0) + '</span>'
+    + '<i>返回值</i><span>' + e.result + '</span>'
+    + '</div><pre>' + esc(e.target) + '</pre><pre>' + esc(e.detail) + '</pre>'
+    + '<pre style="color:var(--dim2)">' + esc(JSON.stringify(e)) + '</pre>';
+  $("drawer").classList.add("open");
+  const body = $("rows");
+  body.querySelectorAll("tr.sel").forEach(t => t.classList.remove("sel"));
+  const tr = body.querySelector('tr[data-seq="' + e.seq + '"]');
+  if (tr) tr.classList.add("sel");
+}
+
+$("rows").addEventListener("click", ev => {
+  const tr = ev.target.closest("tr[data-seq]");
+  if (!tr) return;
+  const e = all.find(x => String(x.seq) === tr.dataset.seq);
+  if (e) showDetail(e);
+});
+$("dClose").onclick = () => $("drawer").classList.remove("open");
+
+function setStatus(txt, cls) {
+  $("status").textContent = txt;
+  $("dot").className = cls;
+}
+
+async function loadMeta() {
+  try {
+    const r = await fetch("/api/meta");
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    meta = await r.json();
+    $("mExe").textContent = meta.exe;
+    $("mPid").textContent = meta.pid;
+    $("mUser").textContent = meta.user;
+    $("mUrl").textContent = meta.url;
+    document.title = "ProcWatch - " + meta.exe + " (" + meta.pid + ")";
+    setInterval(() => {
+      const up = Math.floor((Date.now() - meta.startedMs) / 1000);
+      const h = Math.floor(up / 3600), m = Math.floor(up % 3600 / 60), s = up % 60;
+      $("mUp").textContent = (h ? h + "时" : "") + (m ? m + "分" : "") + s + "秒";
+      $("mDrop").textContent = meta.dropped;
+    }, 1000);
+  } catch (e) {
+    /* Surfaced rather than swallowed: a blank header used to mean a malformed
+     * response, and silence made that hard to notice. */
+    document.title = "ProcWatch - 元数据读取失败";
+    $("mExe").textContent = "读取失败: " + e.message;
+  }
+}
+
+async function loadHistory() {
+  const r = await (await fetch("/api/events?after=0&limit=" + MAX_KEEP)).json();
+  addAll(r.events || []);
+  redraw();
+}
+
+function startStream() {
+  if (source) source.close();
+  source = new EventSource("/api/stream");
+  source.addEventListener("open", () => { fails = 0; setStatus("实时推送中", "on"); });
+  source.addEventListener("events", ev => {
+    try {
+      const arr = JSON.parse(ev.data);
+      if (arr.length) { addAll(arr); appendRows(arr); }
+      if (meta) meta.dropped = 0;
+    } catch (e) { /* ignore malformed frame */ }
+  });
+  source.addEventListener("cleared", () => { all = []; redraw(); });
+  source.onerror = () => {
+    setStatus("推送中断，重试中…", "off");
+    if (++fails >= 3) { source.close(); source = null; startPolling(); }
+  };
+}
+
+function startPolling() {
+  if (pollTimer) return;
+  setStatus("轮询模式", "on");
+  pollTimer = setInterval(async () => {
+    try {
+      const r = await (await fetch("/api/events?after=" + cursor + "&limit=500")).json();
+      if (r.events && r.events.length) { addAll(r.events); appendRows(r.events); }
+    } catch (e) { setStatus("连接已断开", "off"); }
+  }, 1000);
+}
+
+$("bPause").onclick = async () => {
+  paused = !paused;
+  $("bPause").textContent = paused ? "继续采集" : "暂停采集";
+  $("bPause").classList.toggle("active", paused);
+  await fetch("/api/pause?on=" + (paused ? 1 : 0), { method: "POST" });
+};
+$("bClear").onclick = async () => { await fetch("/api/clear", { method: "POST" }); all = []; redraw(); };
+$("bFollow").onclick = () => { follow = !follow; $("bFollow").classList.toggle("active", follow); if (follow) redraw(); };
+$("bSusp").onclick = () => { onlySusp = !onlySusp; $("bSusp").classList.toggle("active", onlySusp); redraw(); };
+$("fCat").onchange = e => { filterCat = parseInt(e.target.value, 10); redraw(); };
+let qt = null;
+$("fQ").oninput = e => {
+  clearTimeout(qt);
+  qt = setTimeout(() => { q = e.target.value.trim().toLowerCase(); redraw(); }, 180);
+};
+$("bJson").onclick = () => { location.href = "/api/export?format=jsonl"; };
+$("bCsv").onclick = () => { location.href = "/api/export?format=csv"; };
+$("bCopy").onclick = async () => {
+  const rows = visible().map(e => [e.time, (CAT[e.cat]||["?"])[0], (LVL[e.lvl]||["?"])[0], e.api, e.target, e.detail].join("  "));
+  try { await navigator.clipboard.writeText(rows.join("\n")); $("bCopy").textContent = "已复制 " + rows.length + " 行";
+        setTimeout(() => $("bCopy").textContent = "复制当前视图", 1500); } catch (e) {}
+};
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") $("drawer").classList.remove("open");
+  if (e.key === "/" && document.activeElement !== $("fQ")) { e.preventDefault(); $("fQ").focus(); }
+});
+
+(async function main() {
+  await loadMeta();
+  try { await loadHistory(); } catch (e) { setStatus("无法读取历史", "off"); }
+  startStream();
+  setTimeout(() => { if (!source && !pollTimer) startPolling(); }, 4000);
+})();
+</script>
+</body>
+</html>

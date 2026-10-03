@@ -1,0 +1,28 @@
+# build output
+build/
+dist/
+
+# object files and linker byproducts
+*.o
+*.obj
+*.res
+*.lib
+*.exp
+*.pdb
+*.ilk
+
+# binaries (the build regenerates these)
+*.exe
+*.dll
+
+# generated at build time from web/*.html by tools/embed.c
+build/gen/
+
+# editor / OS noise
+.vscode/
+.idea/
+*.swp
+*~
+Thumbs.db
+Desktop.ini
+*.log
